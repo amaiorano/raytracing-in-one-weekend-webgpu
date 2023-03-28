@@ -11,6 +11,12 @@ export default class Renderer {
     // Frame Backings
     context: GPUCanvasContext;
 
+    // Compute vars
+    pipeline: GPUComputePipeline;
+    bindGroup: GPUBindGroup;
+    outputBuffer: GPUBuffer;
+    numGroups: number;
+
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
     }
@@ -32,6 +38,76 @@ export default class Renderer {
             this.adapter = await entry.requestAdapter();
             this.device = await this.adapter.requestDevice();
             this.queue = this.device.queue;
+
+            // To keep things simple, make the image size a multiple of the max workgroup size limit
+            const wg_size_limits = [256, 1];
+
+            const width = this.canvas.width;
+            const height = this.canvas.height;
+
+            const groupSize = wg_size_limits[0] * wg_size_limits[1];
+            this.numGroups = (width * height) / groupSize;
+
+            const wgsl = `
+@group(0) @binding(0)
+var<storage, read_write> output : array<u32>;
+
+fn color_to_u32(c : vec3<f32>) -> u32 {
+    let r = u32(c.r * 255.f);
+    let g = u32(c.g * 255.f);
+    let b = u32(c.b * 255.f);
+    let a = 255u;
+    
+    // bgra8unorm
+    return (a << 24) | (r << 16) | (g << 8) | b;
+    
+    // rgba8unorm
+    // return (a << 24) | (b << 16) | (g << 8) | r;
+}
+
+@compute @workgroup_size(${wg_size_limits[0]}, ${wg_size_limits[1]})
+fn main(
+    @builtin(global_invocation_id) global_invocation_id : vec3<u32>,
+    ) {
+        let offset = global_invocation_id.x;
+        
+        // Cast ray at current x,y to get color for current pixel
+        let x = f32(offset % ${width});
+        let y = f32(offset / ${width});
+        
+        let color = vec3(128.f, 0.f, y / ${height}.f);
+        
+        // Store color for current pixel
+        output[offset] = color_to_u32(color);
+}`;
+
+            this.pipeline = this.device.createComputePipeline({
+                layout: 'auto',
+                compute: {
+                    module: this.device.createShaderModule({ code: wgsl }),
+                    entryPoint: 'main'
+                }
+            });
+
+            // Allocate a buffer to hold the output
+            const bufferNumElements = width * height;
+            this.outputBuffer = this.device.createBuffer({
+                size: bufferNumElements * Uint32Array.BYTES_PER_ELEMENT,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+                // mappedAtCreation: true,
+            });
+            // const data = new Uint32Array(this.outputBuffer.getMappedRange());
+            // for (let i = 0; i < bufferNumElements; ++i) {
+            //     data[i] = 0xFF0000FF;
+            // }
+            // this.outputBuffer.unmap();
+
+
+            this.bindGroup = this.device.createBindGroup({
+                layout: this.pipeline.getBindGroupLayout(0),
+                entries: [{ binding: 0, resource: { buffer: this.outputBuffer } }],
+            });
+
         } catch (e) {
             console.error(e);
             return false;
@@ -46,28 +122,52 @@ export default class Renderer {
             const canvasConfig: GPUCanvasConfiguration = {
                 device: this.device,
                 format: 'bgra8unorm',
+                // format: 'rgba8unorm',
                 usage:
-                    GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
+                    GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST
             };
             this.context.configure(canvasConfig);
         }
-
-        const textureDesc: GPUTextureDescriptor = {
-            size: [this.canvas.width, this.canvas.height, 1],
-            dimension: '2d',
-            format: 'bgra8unorm',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
-                | GPUTextureUsage.TEXTURE_BINDING // Texture binding required to be used as a render target
-        };
     }
 
     // Called once per frame
     render(dt: number) {
-        // Acquire next image from context
-        const colorTexture = this.context.getCurrentTexture();
-        // const colorTextureView = colorTexture.createView();
-
         let commandBuffers = Array<GPUCommandBuffer>();
+
+        // Run the compute shader
+        {
+            const computeEncoder = this.device.createCommandEncoder();
+
+            const pass = computeEncoder.beginComputePass();
+            pass.setPipeline(this.pipeline);
+            pass.setBindGroup(0, this.bindGroup);
+            pass.dispatchWorkgroups(this.numGroups);
+            pass.end();
+
+            commandBuffers.push(computeEncoder.finish());
+        }
+
+        {
+            const renderEncoder = this.device.createCommandEncoder();
+
+            const colorTexture = this.context.getCurrentTexture();
+            const imageCopyBuffer: GPUImageCopyBuffer = {
+                buffer: this.outputBuffer,
+                rowsPerImage: this.canvas.height,
+                bytesPerRow: this.canvas.width * 4,
+            };
+            const imageCopyTexture: GPUImageCopyTexture = {
+                texture: colorTexture
+            };
+            const extent: GPUExtent3D = {
+                width: this.canvas.width,
+                height: this.canvas.height
+            };
+            renderEncoder.copyBufferToTexture(imageCopyBuffer, imageCopyTexture, extent);
+
+            commandBuffers.push(renderEncoder.finish());
+        }
+
         this.queue.submit(commandBuffers);
     };
 }

@@ -8,7 +8,7 @@ class App {
     elapsedTime = 0;
 
     constructor(canvas: HTMLCanvasElement) {
-        canvas.width = canvas.height = 640;
+        canvas.width = canvas.height = 512;
         this.canvas = canvas;
         this.renderer = new Renderer(canvas);
     }
