@@ -21,8 +21,8 @@ Install [Node.js](https://nodejs.org/en/). Then,
 clone the repo, and install node dependencies:
 
 ```bash
-git clone https://github.com/amaiorano/raytracing-in-one-weekend.git
-cd raytracing-in-one-weekend
+git clone https://github.com/amaiorano/raytracing-in-one-weekend-webgpu.git
+cd raytracing-in-one-weekend-webgpu
 npm install
 ```
 
