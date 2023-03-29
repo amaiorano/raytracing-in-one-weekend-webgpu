@@ -164,7 +164,97 @@ fn length_squared(v: vec3<f32>) -> f32 {
     let l = length(v);
     return l * l;
 }
+///////////////////////////////////////////////////////////////////////////////
 
+///////////////////////////////////////////////////////////////////////////////
+// hittable
+struct hit_record {
+    p: vec3<f32>,
+    normal: vec3<f32>,
+    t: f32,
+    front_face: bool,
+}
+
+fn hit_record_set_face_normal(rec: ptr<function, hit_record>, r: ray, outward_normal: vec3<f32>) {
+    (*rec).front_face = dot(r.dir, outward_normal) < 0.0;
+    if ((*rec).front_face) {
+        (*rec).normal = outward_normal;
+    } else {
+        (*rec).normal = -outward_normal;
+    }
+}
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// Sphere
+struct sphere {
+    center: vec3<f32>,
+    radius: f32,
+}
+
+fn sphere_hit(s: sphere, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {
+    let oc = r.orig - s.center;
+    let a = length_squared(r.dir);
+    let half_b = dot(oc, r.dir);
+    let c = length_squared(oc) - s.radius*s.radius;
+    let discriminant = half_b*half_b - a*c;
+
+    if (discriminant < 0) {
+        return false;
+    }
+
+    let sqrtd = sqrt(discriminant);
+
+    // Find the nearest root that lies in the acceptable range.
+    var root = (-half_b - sqrtd) / a;
+    if (root < t_min || t_max < root) {
+        root = (-half_b + sqrtd) / a;
+        if (root < t_min || t_max < root) {
+            return false;
+        }
+    }
+
+    (*rec).t = root;
+    (*rec).p = ray_at(r, (*rec).t);
+    let outward_normal = ((*rec).p - s.center) / s.radius;
+    hit_record_set_face_normal(rec, r, outward_normal);
+
+    return true;
+}
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// Hittable List
+const MAX_NUM_SPHERES = 10;
+struct hittable_list {
+    spheres: array<sphere, MAX_NUM_SPHERES>, // TODO: remove fixed size, make this a uniform input struct
+    spheres_size: u32,
+}
+
+fn hittable_list_add_sphere(list: ptr<function, hittable_list>, s: sphere) {
+    (*list).spheres[(*list).spheres_size] = s;
+    (*list).spheres_size += 1;
+}
+
+fn hittable_list_hit(list: ptr<function, hittable_list>, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {
+    var temp_rec: hit_record;
+    var hit_anything = false;
+    var closest_so_far = t_max;
+
+    for (var i = 0u; i < (*list).spheres_size; i += 1u) {
+        let s = ((*list).spheres)[i];
+        // TODO: remove once we pass in this data as uniform
+        if (s.radius == 0.0) {
+            continue;
+        }
+        if (sphere_hit(s, r, t_min, closest_so_far, &temp_rec)) {
+            hit_anything = true;
+            closest_so_far = temp_rec.t;
+            *rec = temp_rec;
+        }
+    }
+    return hit_anything;
+}
 ///////////////////////////////////////////////////////////////////////////////
 
 
@@ -188,19 +278,21 @@ fn hit_sphere(center: vec3<f32>, radius: f32, r: ray) -> f32 {
     }
 }
 
-fn ray_color(r : ray) -> color {
-    var t = hit_sphere(vec3(0.0, 0.0, -1.0), 0.5, r);
-    if (t > 0.0) {
-        let N = normalize(ray_at(r, t) - vec3(0.0, 0.0, -1.0));
-        return 0.5 * color(N.x + 1, N.y + 1, N.z + 1);
+const infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf
+const pi = 3.1415926535897932385;
+
+fn ray_color(r: ray, world: ptr<function, hittable_list>) -> color {
+    var rec: hit_record;
+    if (hittable_list_hit(world, r, 0.0, infinity, &rec)) {
+        return 0.5 * (rec.normal + color(1,1,1));
     }
 
     let unit_direction = normalize(r.dir);
-    t = 0.5 * (unit_direction.y + 1.0);
+    let t = 0.5 * (unit_direction.y + 1.0);
     return (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
 }
 
-fn color_to_u32(c : color) -> u32 {
+fn color_to_u32(c: color) -> u32 {
     let r = u32(c.r * 255.0);
     let g = u32(c.g * 255.0);
     let b = u32(c.b * 255.0);
@@ -226,6 +318,12 @@ fn main(
         const aspect_ratio = ${width} / ${height};
         const image_width = ${width};
         const image_height = ${height};
+
+        // World
+        var world: hittable_list;
+        hittable_list_add_sphere(&world, sphere(vec3(0.0, 0.0, -1.0), 0.5));
+        hittable_list_add_sphere(&world, sphere(vec3(0.0, -100.5, -1.0), 100.0));
+
         
         // Camera
         const viewport_height = 2.0;
@@ -241,14 +339,12 @@ fn main(
         let u = x / image_width;
         let v = y / image_height;
         let r = ray(origin, lower_left_corner + u*horizontal + v*vertical - origin);
-        let pixel_color = ray_color(r);
+        let pixel_color = ray_color(r, &world);
         
         // Store color for current pixel
         output[offset] = color_to_u32(pixel_color);
 }
 ///////////////////////////////////////////////////////////////////////////////
-
-
         `;
 
         return wgsl;
