@@ -139,37 +139,38 @@ export default class Renderer {
         const height = this.canvas.height;
 
         const wgsl = `
-        @group(0) @binding(0)
-        var<storage, read_write> output : array<u32>;
+@group(0) @binding(0)
+var<storage, read_write> output : array<u32>;
+
+fn color_to_u32(c : vec3<f32>) -> u32 {
+    let r = u32(c.r * 255.f);
+    let g = u32(c.g * 255.f);
+    let b = u32(c.b * 255.f);
+    let a = 255u;
+    
+    // bgra8unorm
+    return (a << 24) | (r << 16) | (g << 8) | b;
+    
+    // rgba8unorm
+    // return (a << 24) | (b << 16) | (g << 8) | r;
+}
+
+@compute @workgroup_size(${wgSize})
+fn main(
+    @builtin(global_invocation_id) global_invocation_id : vec3<u32>,
+    ) {
+        let offset = global_invocation_id.x;
         
-        fn color_to_u32(c : vec3<f32>) -> u32 {
-            let r = u32(c.r * 255.f);
-            let g = u32(c.g * 255.f);
-            let b = u32(c.b * 255.f);
-            let a = 255u;
-            
-            // bgra8unorm
-            return (a << 24) | (r << 16) | (g << 8) | b;
-            
-            // rgba8unorm
-            // return (a << 24) | (b << 16) | (g << 8) | r;
-        }
+        // Cast ray at current x,y to get color for current pixel
+        let x = f32(offset % ${width});
+        let y = f32(offset / ${width});
         
-        @compute @workgroup_size(${wgSize})
-        fn main(
-            @builtin(global_invocation_id) global_invocation_id : vec3<u32>,
-            ) {
-                let offset = global_invocation_id.x;
-                
-                // Cast ray at current x,y to get color for current pixel
-                let x = f32(offset % ${width});
-                let y = f32(offset / ${width});
-                
-                let color = vec3(x / ${width}f, 0.0f, y / ${height}.f);
-                
-                // Store color for current pixel
-                output[offset] = color_to_u32(color);
-        }`;
+        let color = vec3(x / ${width}f, 0.0f, y / ${height}.f);
+        
+        // Store color for current pixel
+        output[offset] = color_to_u32(color);
+}
+        `;
 
         return wgsl;
     }
