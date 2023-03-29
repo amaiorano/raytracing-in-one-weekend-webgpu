@@ -39,52 +39,15 @@ export default class Renderer {
             this.device = await this.adapter.requestDevice();
             this.queue = this.device.queue;
 
-            // To keep things simple, make the image size a multiple of the max workgroup size limit
-            const wg_size_limits = [256, 1];
-
+            const wgSize = 256;
             const width = this.canvas.width;
             const height = this.canvas.height;
-
-            const groupSize = wg_size_limits[0] * wg_size_limits[1];
-            this.numGroups = (width * height) / groupSize;
-
-            const wgsl = `
-@group(0) @binding(0)
-var<storage, read_write> output : array<u32>;
-
-fn color_to_u32(c : vec3<f32>) -> u32 {
-    let r = u32(c.r * 255.f);
-    let g = u32(c.g * 255.f);
-    let b = u32(c.b * 255.f);
-    let a = 255u;
-    
-    // bgra8unorm
-    return (a << 24) | (r << 16) | (g << 8) | b;
-    
-    // rgba8unorm
-    // return (a << 24) | (b << 16) | (g << 8) | r;
-}
-
-@compute @workgroup_size(${wg_size_limits[0]}, ${wg_size_limits[1]})
-fn main(
-    @builtin(global_invocation_id) global_invocation_id : vec3<u32>,
-    ) {
-        let offset = global_invocation_id.x;
-        
-        // Cast ray at current x,y to get color for current pixel
-        let x = f32(offset % ${width});
-        let y = f32(offset / ${width});
-        
-        let color = vec3(128.f, 0.f, y / ${height}.f);
-        
-        // Store color for current pixel
-        output[offset] = color_to_u32(color);
-}`;
+            this.numGroups = (width * height) / wgSize;
 
             this.pipeline = this.device.createComputePipeline({
                 layout: 'auto',
                 compute: {
-                    module: this.device.createShaderModule({ code: wgsl }),
+                    module: this.device.createShaderModule({ code: this.computeShader(wgSize) }),
                     entryPoint: 'main'
                 }
             });
@@ -170,4 +133,44 @@ fn main(
 
         this.queue.submit(commandBuffers);
     };
+
+    computeShader(wgSize: number): string {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+
+        const wgsl = `
+        @group(0) @binding(0)
+        var<storage, read_write> output : array<u32>;
+        
+        fn color_to_u32(c : vec3<f32>) -> u32 {
+            let r = u32(c.r * 255.f);
+            let g = u32(c.g * 255.f);
+            let b = u32(c.b * 255.f);
+            let a = 255u;
+            
+            // bgra8unorm
+            return (a << 24) | (r << 16) | (g << 8) | b;
+            
+            // rgba8unorm
+            // return (a << 24) | (b << 16) | (g << 8) | r;
+        }
+        
+        @compute @workgroup_size(${wgSize})
+        fn main(
+            @builtin(global_invocation_id) global_invocation_id : vec3<u32>,
+            ) {
+                let offset = global_invocation_id.x;
+                
+                // Cast ray at current x,y to get color for current pixel
+                let x = f32(offset % ${width});
+                let y = f32(offset / ${width});
+                
+                let color = vec3(128.f, 0.f, y / ${height}.f);
+                
+                // Store color for current pixel
+                output[offset] = color_to_u32(color);
+        }`;
+
+        return wgsl;
+    }
 }

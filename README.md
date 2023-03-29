@@ -4,7 +4,7 @@ This is an implementation of the ray tracer described in [Ray Tracing in One Wee
 
 ## Run
 
-**TODO: LINK HERE**
+https://amaiorano.io/raytracing-in-one-weekend-webgpu/
 
 Note that this should work on the latest version of [Chrome](https://www.google.com/intl/en_us/chrome/) as I registered for a WebGPU [Origin Trial](https://developer.chrome.com/origintrials). Otherwise, you'll need a browser that supports WebGPU, such as [Chrome Canary](https://www.google.com/intl/en_ca/chrome/canary/), and enable experimental support by setting the `https://chrome://flags/#enable-unsafe-webgpu` flag.
 
