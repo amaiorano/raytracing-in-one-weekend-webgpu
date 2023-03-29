@@ -165,7 +165,7 @@ export default class Renderer {
                 let x = f32(offset % ${width});
                 let y = f32(offset / ${width});
                 
-                let color = vec3(128.f, 0.f, y / ${height}.f);
+                let color = vec3(x / ${width}f, 0.0f, y / ${height}.f);
                 
                 // Store color for current pixel
                 output[offset] = color_to_u32(color);
