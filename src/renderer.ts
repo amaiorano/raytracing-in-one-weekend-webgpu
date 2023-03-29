@@ -257,6 +257,53 @@ fn hittable_list_hit(list: ptr<function, hittable_list>, r: ray, t_min: f32, t_m
 }
 ///////////////////////////////////////////////////////////////////////////////
 
+///////////////////////////////////////////////////////////////////////////////
+// Camera
+struct camera {
+    origin: vec3<f32>,
+    lower_left_corner: vec3<f32>,
+    horizontal: vec3<f32>,
+    vertical: vec3<f32>,
+}
+
+fn camera_create(aspect_ratio: f32) -> camera {
+    let viewport_height = 2.0;
+    let viewport_width = aspect_ratio * viewport_height;
+    const focal_length = 1.0;
+
+    let origin = vec3(0.0, 0.0, 0.0);
+    let horizontal = vec3(viewport_width, 0.0, 0.0);
+    let vertical = vec3(0.0, viewport_height, 0.0);
+    let lower_left_corner = origin - horizontal/2 - vertical/2 - vec3(0, 0, focal_length);
+    return camera(origin, lower_left_corner, horizontal, vertical);
+}
+
+fn camera_get_ray(cam: ptr<function, camera>, u: f32, v: f32) -> ray {
+    return ray(
+        (*cam).origin,
+        (*cam).lower_left_corner + u * (*cam).horizontal + v * (*cam).vertical - (*cam).origin
+    );
+}
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// Random
+
+// Implementation copied from https://webgpu.github.io/webgpu-samples/samples/particles#./particle.wgsl
+var<private> rand_seed : vec2<f32>;
+
+fn init_rand(invocation_id : u32, seed : vec4<f32>) {
+  rand_seed = seed.xz;
+  rand_seed = fract(rand_seed * cos(35.456+f32(invocation_id) * seed.yw));
+  rand_seed = fract(rand_seed * cos(41.235+f32(invocation_id) * seed.xw));
+}
+
+fn random_f32() -> f32 {
+  rand_seed.x = fract(cos(dot(rand_seed, vec2<f32>(23.14077926, 232.61690225))) * 136.8168);
+  rand_seed.y = fract(cos(dot(rand_seed, vec2<f32>(54.47856553, 345.84153136))) * 534.7645);
+  return rand_seed.y;
+}
+///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
 // Main
@@ -297,12 +344,19 @@ fn color_to_u32(c: color) -> u32 {
     let g = u32(c.g * 255.0);
     let b = u32(c.b * 255.0);
     let a = 255u;
-    
+
     // bgra8unorm
     return (a << 24) | (r << 16) | (g << 8) | b;
-    
+
     // rgba8unorm
     // return (a << 24) | (b << 16) | (g << 8) | r;
+}
+
+fn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {
+    var c = pixel_color;
+    // Divide the color by the number of samples.
+    c /= f32(samples_per_pixel);
+    output[offset] = color_to_u32(c);
 }
 
 @compute @workgroup_size(${wgSize})
@@ -318,31 +372,27 @@ fn main(
         const aspect_ratio = ${width} / ${height};
         const image_width = ${width};
         const image_height = ${height};
+        const samples_per_pixel = 100;
 
         // World
         var world: hittable_list;
         hittable_list_add_sphere(&world, sphere(vec3(0.0, 0.0, -1.0), 0.5));
         hittable_list_add_sphere(&world, sphere(vec3(0.0, -100.5, -1.0), 100.0));
 
-        
         // Camera
-        const viewport_height = 2.0;
-        const viewport_width = aspect_ratio * viewport_height;
-        const focal_length = 1.0;
-
-        const origin = vec3(0.0, 0.0, 0.0);
-        const horizontal = vec3(viewport_width, 0.0, 0.0);
-        const vertical = vec3(0.0, viewport_height, 0.0);
-        const lower_left_corner = origin - horizontal/2 - vertical/2 - vec3(0, 0, focal_length);
+        var cam = camera_create(aspect_ratio);
 
         // Render
-        let u = x / image_width;
-        let v = y / image_height;
-        let r = ray(origin, lower_left_corner + u*horizontal + v*vertical - origin);
-        let pixel_color = ray_color(r, &world);
-        
+        var pixel_color = color(0.0, 0.0, 0.0);
+        for (var i = 0; i < samples_per_pixel; i += 1) {
+            let u = (x + random_f32()) / (image_width - 1);
+            let v = (y + random_f32()) / (image_height - 1);
+            let r = camera_get_ray(&cam, u, v);
+            pixel_color += ray_color(r, &world);
+        }
+
         // Store color for current pixel
-        output[offset] = color_to_u32(pixel_color);
+        write_color(offset, pixel_color, samples_per_pixel);
 }
 ///////////////////////////////////////////////////////////////////////////////
         `;
