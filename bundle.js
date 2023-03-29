@@ -563,7 +563,7 @@ var Renderer = /*#__PURE__*/function () {
     key: "initializeAPI",
     value: function () {
       var _initializeAPI = _asyncToGenerator( /*#__PURE__*/regenerator_default().mark(function _callee2() {
-        var entry, wg_size_limits, width, height, groupSize, wgsl, bufferNumElements;
+        var entry, wgSize, width, height, bufferNumElements;
         return regenerator_default().wrap(function _callee2$(_context2) {
           while (1) switch (_context2.prev = _context2.next) {
             case 0:
@@ -585,19 +585,15 @@ var Renderer = /*#__PURE__*/function () {
             case 10:
               this.device = _context2.sent;
               this.queue = this.device.queue;
-
-              // To keep things simple, make the image size a multiple of the max workgroup size limit
-              wg_size_limits = [256, 1];
+              wgSize = 256;
               width = this.canvas.width;
               height = this.canvas.height;
-              groupSize = wg_size_limits[0] * wg_size_limits[1];
-              this.numGroups = width * height / groupSize;
-              wgsl = "\n@group(0) @binding(0)\nvar<storage, read_write> output : array<u32>;\n\nfn color_to_u32(c : vec3<f32>) -> u32 {\n    let r = u32(c.r * 255.f);\n    let g = u32(c.g * 255.f);\n    let b = u32(c.b * 255.f);\n    let a = 255u;\n    \n    // bgra8unorm\n    return (a << 24) | (r << 16) | (g << 8) | b;\n    \n    // rgba8unorm\n    // return (a << 24) | (b << 16) | (g << 8) | r;\n}\n\n@compute @workgroup_size(".concat(wg_size_limits[0], ", ").concat(wg_size_limits[1], ")\nfn main(\n    @builtin(global_invocation_id) global_invocation_id : vec3<u32>,\n    ) {\n        let offset = global_invocation_id.x;\n        \n        // Cast ray at current x,y to get color for current pixel\n        let x = f32(offset % ").concat(width, ");\n        let y = f32(offset / ").concat(width, ");\n        \n        let color = vec3(128.f, 0.f, y / ").concat(height, ".f);\n        \n        // Store color for current pixel\n        output[offset] = color_to_u32(color);\n}");
+              this.numGroups = width * height / wgSize;
               this.pipeline = this.device.createComputePipeline({
                 layout: 'auto',
                 compute: {
                   module: this.device.createShaderModule({
-                    code: wgsl
+                    code: this.computeShader(wgSize)
                   }),
                   entryPoint: 'main'
                 }
@@ -625,20 +621,20 @@ var Renderer = /*#__PURE__*/function () {
                   }
                 }]
               });
-              _context2.next = 28;
+              _context2.next = 26;
               break;
-            case 24:
-              _context2.prev = 24;
+            case 22:
+              _context2.prev = 22;
               _context2.t0 = _context2["catch"](0);
               console.error(_context2.t0);
               return _context2.abrupt("return", false);
-            case 28:
+            case 26:
               return _context2.abrupt("return", true);
-            case 29:
+            case 27:
             case "end":
               return _context2.stop();
           }
-        }, _callee2, this, [[0, 24]]);
+        }, _callee2, this, [[0, 22]]);
       }));
       function initializeAPI() {
         return _initializeAPI.apply(this, arguments);
@@ -709,6 +705,14 @@ var Renderer = /*#__PURE__*/function () {
       }
       this.queue.submit(commandBuffers);
     }
+  }, {
+    key: "computeShader",
+    value: function computeShader(wgSize) {
+      var width = this.canvas.width;
+      var height = this.canvas.height;
+      var wgsl = "\n        @group(0) @binding(0)\n        var<storage, read_write> output : array<u32>;\n        \n        fn color_to_u32(c : vec3<f32>) -> u32 {\n            let r = u32(c.r * 255.f);\n            let g = u32(c.g * 255.f);\n            let b = u32(c.b * 255.f);\n            let a = 255u;\n            \n            // bgra8unorm\n            return (a << 24) | (r << 16) | (g << 8) | b;\n            \n            // rgba8unorm\n            // return (a << 24) | (b << 16) | (g << 8) | r;\n        }\n        \n        @compute @workgroup_size(".concat(wgSize, ")\n        fn main(\n            @builtin(global_invocation_id) global_invocation_id : vec3<u32>,\n            ) {\n                let offset = global_invocation_id.x;\n                \n                // Cast ray at current x,y to get color for current pixel\n                let x = f32(offset % ").concat(width, ");\n                let y = f32(offset / ").concat(width, ");\n                \n                let color = vec3(128.f, 0.f, y / ").concat(height, ".f);\n                \n                // Store color for current pixel\n                output[offset] = color_to_u32(color);\n        }");
+      return wgsl;
+    }
   }]);
   return Renderer;
 }();
@@ -725,7 +729,7 @@ var App = /*#__PURE__*/function () {
     _classCallCheck(this, App);
     _defineProperty(this, "elapsedTime", 0);
     _defineProperty(this, "keysPressed", {});
-    canvas.width = canvas.height = 512;
+    canvas.width = canvas.height = 64 * 12;
     this.canvas = canvas;
     this.renderer = new Renderer(canvas);
   }
