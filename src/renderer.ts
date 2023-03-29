@@ -165,8 +165,20 @@ alias color = vec3<f32>;
 @group(0) @binding(0)
 var<storage, read_write> output : array<u32>;
 
+fn hit_sphere(center: vec3<f32>, radius: f32, r: ray) -> bool {
+    let oc = r.orig - center;
+    let a = dot(r.dir, r.dir);
+    let b = 2.0 * dot(oc, r.dir);
+    let c = dot(oc, oc) - radius * radius;
+    let discriminant = b * b - 4 * a * c;
+    return discriminant > 0;
+}
 
 fn ray_color(r : ray) -> color {
+    if (hit_sphere(vec3(0.0, 0.0, -1.0), 0.5, r)) {
+        return color(1.0, 0.0, 0.0);
+    }
+
     let unit_direction = normalize(r.dir);
     let t = 0.5 * (unit_direction.y + 1.0);
     return (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
