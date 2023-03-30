@@ -167,7 +167,7 @@ fn length_squared(v: vec3<f32>) -> f32 {
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
-// hittable
+// Hittable
 struct hit_record {
     p: vec3<f32>,
     normal: vec3<f32>,
@@ -298,10 +298,23 @@ fn init_rand(invocation_id : u32, seed : vec4<f32>) {
   rand_seed = fract(rand_seed * cos(41.235+f32(invocation_id) * seed.xw));
 }
 
+// Returns random value in [0.0, 1.0)
 fn random_f32() -> f32 {
   rand_seed.x = fract(cos(dot(rand_seed, vec2<f32>(23.14077926, 232.61690225))) * 136.8168);
   rand_seed.y = fract(cos(dot(rand_seed, vec2<f32>(54.47856553, 345.84153136))) * 534.7645);
   return rand_seed.y;
+}
+
+fn random_range_f32(min: f32, max: f32) -> f32 {
+    return mix(min, max, random_f32());
+}
+
+fn random_vec3f() -> vec3<f32> {
+    return vec3(random_f32(), random_f32(), random_f32());
+}
+
+fn random_range_vec3f(min: f32, max: f32) -> vec3<f32> {
+    return vec3(random_range_f32(min, max), random_range_f32(min, max), random_range_f32(min, max));
 }
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -328,15 +341,69 @@ fn hit_sphere(center: vec3<f32>, radius: f32, r: ray) -> f32 {
 const infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf
 const pi = 3.1415926535897932385;
 
-fn ray_color(r: ray, world: ptr<function, hittable_list>) -> color {
+fn random_in_unit_sphere() -> vec3<f32> {
+    var p : vec3<f32>;
+    while (true) {
+        p = random_range_vec3f(-1, 1);
+        if (length_squared(p) >= 1) {
+            continue;
+        }
+        break;
+    }
+    return p;
+}
+
+fn random_unit_vector() -> vec3<f32> {
+    return normalize(random_in_unit_sphere());
+}
+
+fn random_in_hemisphere(normal: vec3<f32>) -> vec3<f32> {
+    let in_unit_sphere = random_in_unit_sphere();
+    if (dot(in_unit_sphere, normal) > 0.0) { // In the same hemisphere as the normal
+        return in_unit_sphere;
+    }
+    else {
+        return -in_unit_sphere;
+    }
+}
+
+fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) -> color {
+    // Book uses recursion for bouncing rays. We can't recurse in WGSL, so convert algorithm to procedural.
+    var r = in_r;
+    var c : color = color(1,1,1);
     var rec: hit_record;
-    if (hittable_list_hit(world, r, 0.0, infinity, &rec)) {
-        return 0.5 * (rec.normal + color(1,1,1));
+    var max_depth = in_max_depth;
+    var hit_count = 1; // Start at 1 for the "no hit" case
+
+    while (true) {
+        if (hittable_list_hit(world, r, 0.001, infinity, &rec)) {
+            hit_count += 1;
+            
+            // Two different diffuse rendering methods (see section 8.6):
+            // lambertian
+            let tgt = rec.p + rec.normal + random_unit_vector();
+            // hemispherical scattering
+            // let tgt = rec.p + random_in_hemisphere(rec.normal);
+
+            r = ray(rec.p, tgt - rec.p);
+        } else {
+            // If we hit nothing, return a blue sky color (linear blend of ray direction with white and blue)
+            let unit_direction = normalize(r.dir);
+            let t = 0.5 * (unit_direction.y + 1.0);
+            c = (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
+            break;
+        }
+
+        // If we've exceeded the ray bounce limit, no more light is gathered.
+        max_depth -= 1;
+        if (max_depth <= 0) {
+            c = color(0,0,0);
+            break;
+        }
     }
 
-    let unit_direction = normalize(r.dir);
-    let t = 0.5 * (unit_direction.y + 1.0);
-    return (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
+    c /= f32(hit_count);
+    return c;
 }
 
 fn color_to_u32(c: color) -> u32 {
@@ -356,6 +423,10 @@ fn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {
     var c = pixel_color;
     // Divide the color by the number of samples.
     c /= f32(samples_per_pixel);
+
+    // And gamma-correct for gamma=2.0.
+    c = sqrt(c);
+
     output[offset] = color_to_u32(c);
 }
 
@@ -363,6 +434,8 @@ fn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {
 fn main(
     @builtin(global_invocation_id) global_invocation_id : vec3<u32>,
     ) {
+        init_rand(global_invocation_id.x, vec4(vec3<f32>(global_invocation_id), 1.0));
+
         // Compute current x,y
         let offset = global_invocation_id.x;
         let x = f32(offset % ${width});
@@ -373,6 +446,7 @@ fn main(
         const image_width = ${width};
         const image_height = ${height};
         const samples_per_pixel = 100;
+        const max_depth = 50;
 
         // World
         var world: hittable_list;
@@ -388,7 +462,7 @@ fn main(
             let u = (x + random_f32()) / (image_width - 1);
             let v = (y + random_f32()) / (image_height - 1);
             let r = camera_get_ray(&cam, u, v);
-            pixel_color += ray_color(r, &world);
+            pixel_color += ray_color(r, &world, max_depth);
         }
 
         // Store color for current pixel
