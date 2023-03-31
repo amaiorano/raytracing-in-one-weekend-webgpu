@@ -164,6 +164,11 @@ fn length_squared(v: vec3<f32>) -> f32 {
     let l = length(v);
     return l * l;
 }
+
+fn near_zero(v: vec3<f32>) -> bool {
+    const s = 1e-8;
+    return length(v) < s;
+}
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -173,6 +178,7 @@ struct hit_record {
     normal: vec3<f32>,
     t: f32,
     front_face: bool,
+    mat: material,
 }
 
 fn hit_record_set_face_normal(rec: ptr<function, hit_record>, r: ray, outward_normal: vec3<f32>) {
@@ -186,10 +192,75 @@ fn hit_record_set_face_normal(rec: ptr<function, hit_record>, r: ray, outward_no
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
+// Material
+
+alias material_type = u32;
+const MATERIAL_LAMBERTIAN : material_type = 0;
+const MATERIAL_METAL : material_type = 1;
+
+struct lambertian_material {
+    albedo : color,
+}
+
+struct metal_material {
+    albedo: color,
+}
+
+struct material {
+    // NOTE: ideally we'd use a discrimination union
+    ty: material_type,
+    lambertian: lambertian_material,
+    metal: metal_material,
+}
+
+fn material_create_lambertian(albedo: color) -> material {
+    var m: material;
+    m.ty = MATERIAL_LAMBERTIAN;
+    m.lambertian = lambertian_material(albedo);
+    return m;
+}
+
+fn material_create_metal(albedo: color) -> material {
+    var m: material;
+    m.ty = MATERIAL_METAL;
+    m.metal = metal_material(albedo);
+    return m;
+}
+
+// For the input ray and hit on the input material, returns true if the ray bounces, and if so,
+// stores the color contribution (attenuation) from this material and the new bounce (scatter) ray.
+fn material_scatter(m: material, r_in: ray, rec: hit_record, attenuation: ptr<function, color>, scattered: ptr<function, ray>) -> bool {
+    if (m.ty == MATERIAL_LAMBERTIAN) {
+        var scatter_direction = rec.normal + random_unit_vector();
+
+        // Catch degenerate scatter direction
+        if (near_zero(scatter_direction)) {
+            scatter_direction = rec.normal;
+        }
+
+        *scattered = ray(rec.p, scatter_direction);
+        *attenuation = m.lambertian.albedo;
+        return true;
+
+    } else if (m.ty == MATERIAL_METAL) {
+        let reflected = reflect(normalize(r_in.dir), rec.normal);
+        *scattered = ray(rec.p, reflected);
+        *attenuation = m.metal.albedo;
+        // Only bounce rays that reflect in the same direction as the incident normal
+        return dot((*scattered).dir, rec.normal) > 0;
+    }
+
+    return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
 // Sphere
 struct sphere {
     center: vec3<f32>,
     radius: f32,
+    mat: material, // TODO: index into storage buffer of materials
 }
 
 fn sphere_hit(s: sphere, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {
@@ -218,6 +289,7 @@ fn sphere_hit(s: sphere, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_
     (*rec).p = ray_at(r, (*rec).t);
     let outward_normal = ((*rec).p - s.center) / s.radius;
     hit_record_set_face_normal(rec, r, outward_normal);
+    (*rec).mat = s.mat;
 
     return true;
 }
@@ -324,20 +396,6 @@ fn random_range_vec3f(min: f32, max: f32) -> vec3<f32> {
 @group(0) @binding(0)
 var<storage, read_write> output : array<u32>;
 
-fn hit_sphere(center: vec3<f32>, radius: f32, r: ray) -> f32 {
-    let oc = r.orig - center;
-    let a = length_squared(r.dir);
-    let half_b = dot(oc, r.dir);
-    let c = length_squared(oc) - radius*radius;
-    let discriminant = half_b*half_b - a*c;
-
-    if (discriminant < 0) {
-        return -1.0;
-    } else {
-        return (-half_b - sqrt(discriminant) ) / a;
-    }
-}
-
 const infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf
 const pi = 3.1415926535897932385;
 
@@ -370,27 +428,30 @@ fn random_in_hemisphere(normal: vec3<f32>) -> vec3<f32> {
 fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) -> color {
     // Book uses recursion for bouncing rays. We can't recurse in WGSL, so convert algorithm to procedural.
     var r = in_r;
-    var c : color = color(1,1,1);
+    var c : color = color(0,0,0);
     var rec: hit_record;
     var max_depth = in_max_depth;
     var hit_count = 1; // Start at 1 for the "no hit" case
 
     while (true) {
         if (hittable_list_hit(world, r, 0.001, infinity, &rec)) {
-            hit_count += 1;
-            
-            // Two different diffuse rendering methods (see section 8.6):
-            // lambertian
-            let tgt = rec.p + rec.normal + random_unit_vector();
-            // hemispherical scattering
-            // let tgt = rec.p + random_in_hemisphere(rec.normal);
+           var attenuation: color;
+           var scattered: ray;
+            if (material_scatter(rec.mat, r, rec, &attenuation, &scattered)) {
+                hit_count += 1;
+                c += attenuation;
+                r = scattered;
+            } else {
+                // Material does not contribute, final color is black
+                c = color(0,0,0);
+                break;
+            }
 
-            r = ray(rec.p, tgt - rec.p);
         } else {
             // If we hit nothing, return a blue sky color (linear blend of ray direction with white and blue)
             let unit_direction = normalize(r.dir);
             let t = 0.5 * (unit_direction.y + 1.0);
-            c = (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
+            c += (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
             break;
         }
 
@@ -425,7 +486,7 @@ fn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {
     c /= f32(samples_per_pixel);
 
     // And gamma-correct for gamma=2.0.
-    c = sqrt(c);
+    // c = sqrt(c);
 
     output[offset] = color_to_u32(c);
 }
@@ -450,8 +511,16 @@ fn main(
 
         // World
         var world: hittable_list;
-        hittable_list_add_sphere(&world, sphere(vec3(0.0, 0.0, -1.0), 0.5));
-        hittable_list_add_sphere(&world, sphere(vec3(0.0, -100.5, -1.0), 100.0));
+
+        let material_ground = material_create_lambertian(color(0.8, 0.8, 0.0));
+        let material_center = material_create_lambertian(color(0.7, 0.3, 0.3));
+        let material_left = material_create_metal(color(0.8, 0.8, 0.8));
+        let material_right = material_create_metal(color(0.8, 0.6, 0.2));
+
+        hittable_list_add_sphere(&world, sphere(vec3( 0.0, -100.5, -1.0), 100.0, material_ground));
+        hittable_list_add_sphere(&world, sphere(vec3( 0.0,    0.0, -1.0),   0.5, material_center));
+        hittable_list_add_sphere(&world, sphere(vec3(-1.0,    0.0, -1.0),   0.5, material_left));
+        hittable_list_add_sphere(&world, sphere(vec3( 1.0,    0.0, -1.0),   0.5, material_right));
 
         // Camera
         var cam = camera_create(aspect_ratio);
