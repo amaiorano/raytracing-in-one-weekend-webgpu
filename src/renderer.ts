@@ -405,22 +405,34 @@ struct camera {
     vertical: vec3<f32>,
 }
 
-fn camera_create(aspect_ratio: f32) -> camera {
-    let viewport_height = 2.0;
+fn camera_create(
+        lookfrom: vec3<f32>,
+        lookat: vec3<f32>,
+        vup : vec3<f32>,
+        vfov: f32, // vertical field-of-view in degrees
+        aspect_ratio: f32) -> camera {
+    let theta = radians(vfov);
+    let h = tan(theta/2);
+    let viewport_height = 2.0 * h;
     let viewport_width = aspect_ratio * viewport_height;
-    const focal_length = 1.0;
 
-    let origin = vec3(0.0, 0.0, 0.0);
-    let horizontal = vec3(viewport_width, 0.0, 0.0);
-    let vertical = vec3(0.0, viewport_height, 0.0);
-    let lower_left_corner = origin - horizontal/2 - vertical/2 - vec3(0, 0, focal_length);
+    // Note: vup, v, and w are all in the same plane
+    let w = normalize(lookfrom - lookat);
+    let u = normalize(cross(vup, w));
+    let v = cross(w, u);
+
+    let origin = lookfrom;
+    let horizontal = viewport_width * u;
+    let vertical = viewport_height * v;
+    let lower_left_corner = origin - horizontal/2 - vertical/2 - w;
+
     return camera(origin, lower_left_corner, horizontal, vertical);
 }
 
-fn camera_get_ray(cam: ptr<function, camera>, u: f32, v: f32) -> ray {
+fn camera_get_ray(cam: ptr<function, camera>, s: f32, t: f32) -> ray {
     return ray(
         (*cam).origin,
-        (*cam).lower_left_corner + u * (*cam).horizontal + v * (*cam).vertical - (*cam).origin
+        (*cam).lower_left_corner + s * (*cam).horizontal + t * (*cam).vertical - (*cam).origin
     );
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -562,7 +574,8 @@ fn main(
         hittable_list_add_sphere(&world, sphere(vec3( 1.0,    0.0, -1.0),   0.5, material_right));
 
         // Camera
-        var cam = camera_create(aspect_ratio);
+        // var cam = camera_create(150, aspect_ratio);
+        var cam = camera_create(vec3<f32>(-2,2,1), vec3<f32>(0,0,-1), vec3<f32>(0,1,0), 50, aspect_ratio);
 
         // Render
         var pixel_color = color(0.0, 0.0, 0.0);
