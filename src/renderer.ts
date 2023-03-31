@@ -221,8 +221,9 @@ fn hit_record_set_face_normal(rec: ptr<function, hit_record>, r: ray, outward_no
 // Material
 
 alias material_type = u32;
-const MATERIAL_LAMBERTIAN : material_type = 0;
-const MATERIAL_METAL : material_type = 1;
+const MATERIAL_LAMBERTIAN:  material_type = 0;
+const MATERIAL_METAL:       material_type = 1;
+const MATERIAL_DIELECTRIC:  material_type = 2;
 
 struct lambertian_material {
     albedo : color,
@@ -233,11 +234,16 @@ struct metal_material {
     fuzz: f32,
 }
 
+struct dielectric_material {
+    ir: f32 // index of refraction
+}
+
 struct material {
     // NOTE: ideally we'd use a discrimination union
     ty: material_type,
     lambertian: lambertian_material,
     metal: metal_material,
+    dielectric: dielectric_material
 }
 
 fn material_create_lambertian(albedo: color) -> material {
@@ -251,6 +257,13 @@ fn material_create_metal(albedo: color, fuzz: f32) -> material {
     var m: material;
     m.ty = MATERIAL_METAL;
     m.metal = metal_material(albedo, fuzz);
+    return m;
+}
+
+fn material_create_dielectric(ir: f32) -> material {
+    var m: material;
+    m.ty = MATERIAL_DIELECTRIC;
+    m.dielectric = dielectric_material(ir);
     return m;
 }
 
@@ -275,9 +288,36 @@ fn material_scatter(m: material, r_in: ray, rec: hit_record, attenuation: ptr<fu
         *attenuation = m.metal.albedo;
         // Only bounce rays that reflect in the same direction as the incident normal
         return dot((*scattered).dir, rec.normal) > 0;
+    
+    } else if (m.ty == MATERIAL_DIELECTRIC) {
+        *attenuation = color(1, 1, 1);
+        let refraction_ratio = select(m.dielectric.ir, 1.0 / m.dielectric.ir, rec.front_face);
+
+        let unit_direction = normalize(r_in.dir);
+        let cos_theta = min(dot(-unit_direction, rec.normal), 1.0);
+        let sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+        let cannot_refract = (refraction_ratio * sin_theta) > 1.0;
+        var direction: vec3<f32>;
+
+        if (cannot_refract || reflectance(cos_theta, refraction_ratio) > random_f32()) {
+            direction = reflect(unit_direction, rec.normal);
+        } else {
+            direction = refract(unit_direction, rec.normal, refraction_ratio);
+        }
+
+        *scattered = ray(rec.p, direction);
+        return true;
     }
 
     return false;
+}
+
+fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
+    // Use Schlick's approximation for reflectance.
+    var r0 = (1-ref_idx) / (1+ref_idx);
+    r0 = r0*r0;
+    return r0 + (1-r0)*pow((1 - cosine),5);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -511,13 +551,14 @@ fn main(
         var world: hittable_list;
 
         let material_ground = material_create_lambertian(color(0.8, 0.8, 0.0));
-        let material_center = material_create_lambertian(color(0.7, 0.3, 0.3));
-        let material_left = material_create_metal(color(0.8, 0.8, 0.8), 0.3);
-        let material_right = material_create_metal(color(0.8, 0.6, 0.2), 1.0);
+        let material_center = material_create_lambertian(color(0.1, 0.2, 0.5));
+        let material_left = material_create_dielectric(1.5);
+        let material_right = material_create_metal(color(0.8, 0.6, 0.2), 0.0);
 
         hittable_list_add_sphere(&world, sphere(vec3( 0.0, -100.5, -1.0), 100.0, material_ground));
         hittable_list_add_sphere(&world, sphere(vec3( 0.0,    0.0, -1.0),   0.5, material_center));
         hittable_list_add_sphere(&world, sphere(vec3(-1.0,    0.0, -1.0),   0.5, material_left));
+        hittable_list_add_sphere(&world, sphere(vec3(-1.0,    0.0, -1.0),  -0.4, material_left));
         hittable_list_add_sphere(&world, sphere(vec3( 1.0,    0.0, -1.0),   0.5, material_right));
 
         // Camera
