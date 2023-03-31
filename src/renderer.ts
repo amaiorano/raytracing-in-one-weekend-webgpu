@@ -569,17 +569,8 @@ fn main(
     ) {
         init_rand(global_invocation_id.x, vec4(vec3<f32>(global_invocation_id), 1.0));
 
-        // Compute current x,y
-        let offset = global_invocation_id.x;
-        let x = f32(offset % ${width});
-        let y = ${height} - f32(offset / ${width}); // Flip Y so Y+ is up
-
         // Image
-        const aspect_ratio = ${width} / ${height};
-        const image_width = ${width};
-        const image_height = ${height};
-        const samples_per_pixel = 100;
-        const max_depth = 50;
+        const aspect_ratio = ${width}f / ${height}f;
 
         // World
         var world: hittable_list;
@@ -605,6 +596,15 @@ fn main(
         var cam = camera_create(lookfrom, lookat, vup, vfov, aspect_ratio, aperture, dist_to_focus);
 
         // Render
+        // Compute current x,y
+        let offset = global_invocation_id.x;
+        let x = f32(offset % ${width});
+        let y = ${height} - f32(offset / ${width}); // Flip Y so Y+ is up
+        const image_height = ${height};
+        const image_width = ${width};
+        const samples_per_pixel = 100;
+        const max_depth = 50;
+
         var pixel_color = color(0.0, 0.0, 0.0);
         for (var i = 0; i < samples_per_pixel; i += 1) {
             let u = (x + random_f32()) / (image_width - 1);
