@@ -428,18 +428,16 @@ fn random_in_hemisphere(normal: vec3<f32>) -> vec3<f32> {
 fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) -> color {
     // Book uses recursion for bouncing rays. We can't recurse in WGSL, so convert algorithm to procedural.
     var r = in_r;
-    var c : color = color(0,0,0);
+    var c : color = color(1,1,1);
     var rec: hit_record;
     var max_depth = in_max_depth;
-    var hit_count = 1; // Start at 1 for the "no hit" case
 
     while (true) {
         if (hittable_list_hit(world, r, 0.001, infinity, &rec)) {
            var attenuation: color;
            var scattered: ray;
             if (material_scatter(rec.mat, r, rec, &attenuation, &scattered)) {
-                hit_count += 1;
-                c += attenuation;
+                c *= attenuation;
                 r = scattered;
             } else {
                 // Material does not contribute, final color is black
@@ -451,7 +449,7 @@ fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) 
             // If we hit nothing, return a blue sky color (linear blend of ray direction with white and blue)
             let unit_direction = normalize(r.dir);
             let t = 0.5 * (unit_direction.y + 1.0);
-            c += (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
+            c *= (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
             break;
         }
 
@@ -463,7 +461,6 @@ fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) 
         }
     }
 
-    c /= f32(hit_count);
     return c;
 }
 
@@ -486,7 +483,7 @@ fn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {
     c /= f32(samples_per_pixel);
 
     // And gamma-correct for gamma=2.0.
-    // c = sqrt(c);
+    c = sqrt(c);
 
     output[offset] = color_to_u32(c);
 }
