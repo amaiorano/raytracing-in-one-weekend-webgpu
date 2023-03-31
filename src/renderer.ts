@@ -169,6 +169,32 @@ fn near_zero(v: vec3<f32>) -> bool {
     const s = 1e-8;
     return length(v) < s;
 }
+
+fn random_in_unit_sphere() -> vec3<f32> {
+    var p : vec3<f32>;
+    while (true) {
+        p = random_range_vec3f(-1, 1);
+        if (length_squared(p) >= 1) {
+            continue;
+        }
+        break;
+    }
+    return p;
+}
+
+fn random_unit_vector() -> vec3<f32> {
+    return normalize(random_in_unit_sphere());
+}
+
+fn random_in_hemisphere(normal: vec3<f32>) -> vec3<f32> {
+    let in_unit_sphere = random_in_unit_sphere();
+    if (dot(in_unit_sphere, normal) > 0.0) { // In the same hemisphere as the normal
+        return in_unit_sphere;
+    }
+    else {
+        return -in_unit_sphere;
+    }
+}
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -204,6 +230,7 @@ struct lambertian_material {
 
 struct metal_material {
     albedo: color,
+    fuzz: f32,
 }
 
 struct material {
@@ -220,10 +247,10 @@ fn material_create_lambertian(albedo: color) -> material {
     return m;
 }
 
-fn material_create_metal(albedo: color) -> material {
+fn material_create_metal(albedo: color, fuzz: f32) -> material {
     var m: material;
     m.ty = MATERIAL_METAL;
-    m.metal = metal_material(albedo);
+    m.metal = metal_material(albedo, fuzz);
     return m;
 }
 
@@ -244,7 +271,7 @@ fn material_scatter(m: material, r_in: ray, rec: hit_record, attenuation: ptr<fu
 
     } else if (m.ty == MATERIAL_METAL) {
         let reflected = reflect(normalize(r_in.dir), rec.normal);
-        *scattered = ray(rec.p, reflected);
+        *scattered = ray(rec.p, reflected + m.metal.fuzz * random_in_unit_sphere());
         *attenuation = m.metal.albedo;
         // Only bounce rays that reflect in the same direction as the incident normal
         return dot((*scattered).dir, rec.normal) > 0;
@@ -399,32 +426,6 @@ var<storage, read_write> output : array<u32>;
 const infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf
 const pi = 3.1415926535897932385;
 
-fn random_in_unit_sphere() -> vec3<f32> {
-    var p : vec3<f32>;
-    while (true) {
-        p = random_range_vec3f(-1, 1);
-        if (length_squared(p) >= 1) {
-            continue;
-        }
-        break;
-    }
-    return p;
-}
-
-fn random_unit_vector() -> vec3<f32> {
-    return normalize(random_in_unit_sphere());
-}
-
-fn random_in_hemisphere(normal: vec3<f32>) -> vec3<f32> {
-    let in_unit_sphere = random_in_unit_sphere();
-    if (dot(in_unit_sphere, normal) > 0.0) { // In the same hemisphere as the normal
-        return in_unit_sphere;
-    }
-    else {
-        return -in_unit_sphere;
-    }
-}
-
 fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) -> color {
     // Book uses recursion for bouncing rays. We can't recurse in WGSL, so convert algorithm to procedural.
     var r = in_r;
@@ -441,7 +442,7 @@ fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) 
                 r = scattered;
             } else {
                 // Material does not contribute, final color is black
-                c = color(0,0,0);
+                c *= color(0,0,0);
                 break;
             }
 
@@ -456,7 +457,7 @@ fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) 
         // If we've exceeded the ray bounce limit, no more light is gathered.
         max_depth -= 1;
         if (max_depth <= 0) {
-            c = color(0,0,0);
+            c *= color(0,0,0);
             break;
         }
     }
@@ -511,8 +512,8 @@ fn main(
 
         let material_ground = material_create_lambertian(color(0.8, 0.8, 0.0));
         let material_center = material_create_lambertian(color(0.7, 0.3, 0.3));
-        let material_left = material_create_metal(color(0.8, 0.8, 0.8));
-        let material_right = material_create_metal(color(0.8, 0.6, 0.2));
+        let material_left = material_create_metal(color(0.8, 0.8, 0.8), 0.3);
+        let material_right = material_create_metal(color(0.8, 0.6, 0.2), 1.0);
 
         hittable_list_add_sphere(&world, sphere(vec3( 0.0, -100.5, -1.0), 100.0, material_ground));
         hittable_list_add_sphere(&world, sphere(vec3( 0.0,    0.0, -1.0),   0.5, material_center));
