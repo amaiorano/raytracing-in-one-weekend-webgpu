@@ -195,6 +195,18 @@ fn random_in_hemisphere(normal: vec3<f32>) -> vec3<f32> {
         return -in_unit_sphere;
     }
 }
+
+fn random_in_unit_disk() -> vec3<f32> {
+    var p : vec3<f32>;
+    while (true) {
+        p = vec3<f32>(random_range_f32(-1,1), random_range_f32(-1,1), 0);
+        if (length_squared(p) >= 1) {
+            continue;
+        }
+        break;
+    }
+    return p;
+}
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -403,6 +415,10 @@ struct camera {
     lower_left_corner: vec3<f32>,
     horizontal: vec3<f32>,
     vertical: vec3<f32>,
+    u : vec3<f32>,
+    v : vec3<f32>,
+    w : vec3<f32>,
+    lens_radius : f32,
 }
 
 fn camera_create(
@@ -410,7 +426,10 @@ fn camera_create(
         lookat: vec3<f32>,
         vup : vec3<f32>,
         vfov: f32, // vertical field-of-view in degrees
-        aspect_ratio: f32) -> camera {
+        aspect_ratio: f32,
+        aperture : f32,
+        focus_dist: f32
+        ) -> camera {
     let theta = radians(vfov);
     let h = tan(theta/2);
     let viewport_height = 2.0 * h;
@@ -422,17 +441,20 @@ fn camera_create(
     let v = cross(w, u);
 
     let origin = lookfrom;
-    let horizontal = viewport_width * u;
-    let vertical = viewport_height * v;
-    let lower_left_corner = origin - horizontal/2 - vertical/2 - w;
+    let horizontal = focus_dist * viewport_width * u;
+    let vertical = focus_dist * viewport_height * v;
+    let lower_left_corner = origin - horizontal/2 - vertical/2 - focus_dist * w;
+    let lens_radius = aperture / 2;
 
-    return camera(origin, lower_left_corner, horizontal, vertical);
+    return camera(origin, lower_left_corner, horizontal, vertical, u, v, w, lens_radius);
 }
 
 fn camera_get_ray(cam: ptr<function, camera>, s: f32, t: f32) -> ray {
+    let rd = (*cam).lens_radius * random_in_unit_disk();
+    let offset = (*cam).u * rd.x + (*cam).v * rd.y;
     return ray(
-        (*cam).origin,
-        (*cam).lower_left_corner + s * (*cam).horizontal + t * (*cam).vertical - (*cam).origin
+        (*cam).origin + offset,
+        (*cam).lower_left_corner + s * (*cam).horizontal + t * (*cam).vertical - (*cam).origin - offset
     );
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -574,8 +596,13 @@ fn main(
         hittable_list_add_sphere(&world, sphere(vec3( 1.0,    0.0, -1.0),   0.5, material_right));
 
         // Camera
-        // var cam = camera_create(150, aspect_ratio);
-        var cam = camera_create(vec3<f32>(-2,2,1), vec3<f32>(0,0,-1), vec3<f32>(0,1,0), 50, aspect_ratio);
+        let lookfrom = vec3<f32>(3,3,2);
+        let lookat = vec3<f32>(0,0,-1);
+        let vup = vec3<f32>(0,1,0);
+        let dist_to_focus = length(lookfrom - lookat);
+        let aperture = 2.0;
+        let vfov = 20.0;
+        var cam = camera_create(lookfrom, lookat, vup, vfov, aspect_ratio, aperture, dist_to_focus);
 
         // Render
         var pixel_color = color(0.0, 0.0, 0.0);
