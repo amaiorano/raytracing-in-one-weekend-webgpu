@@ -37,7 +37,7 @@ class DynamicBuffer {
     }
 }
 
-class Material {
+class Materials extends DynamicBuffer {
     // /*            align(16) size(16) */ struct lambertian_material {
     // /* offset( 0) align(16) size(12) */   albedo : vec3<f32>;
     // /* offset(12) align( 1) size( 4) */   // -- implicit struct size padding --;
@@ -60,42 +60,37 @@ class Material {
     // /* offset(48) align( 4) size( 4) */   dielectric : dielectric_material;
     // /* offset(52) align( 1) size(12) */   // -- implicit struct size padding --;
     // /*                               */ };
-    buffer: ArrayBuffer
-
-    static CreateLambertian(albedo: vec3): Material {
-        let m = new Material;
-        m.buffer = new ArrayBuffer(64);
+    AddLambertian(albedo: vec3) {
+        const m = new ArrayBuffer(64);
         // ty
-        new Uint32Array(m.buffer, 0).set([0]);
+        new Uint32Array(m, 0).set([0]);
         // lambertian_material
-        new Float32Array(m.buffer, 16).set([
+        new Float32Array(m, 16).set([
             albedo[0], albedo[1], albedo[2]
         ]);
-        return m;
+        this.Add(m);
     }
 
-    static CreateMetal(albedo: vec3, fuzz: number): Material {
-        let m = new Material;
-        m.buffer = new ArrayBuffer(64);
+    AddMetal(albedo: vec3, fuzz: number) {
+        const m = new ArrayBuffer(64);
         // ty
-        new Uint32Array(m.buffer, 0).set([1]);
+        new Uint32Array(m, 0).set([1]);
         // metal_material
-        new Float32Array(m.buffer, 32).set([
+        new Float32Array(m, 32).set([
             albedo[0], albedo[1], albedo[2], fuzz
         ]);
-        return m;
+        this.Add(m);
     }
 
-    static CreateDieletric(ir: number): Material {
-        let m = new Material;
-        m.buffer = new ArrayBuffer(64);
+    AddDieletric(ir: number) {
+        const m = new ArrayBuffer(64);
         // ty
-        new Uint32Array(m.buffer, 0).set([2]);
+        new Uint32Array(m, 0).set([2]);
         // dielectric_material
-        new Float32Array(m.buffer, 48).set([
+        new Float32Array(m, 48).set([
             ir
         ]);
-        return m;
+        this.Add(m);
     }
 }
 
@@ -186,20 +181,19 @@ export default class Renderer {
             }
 
             // Materials buffer
+            let materials = new Materials();
             {
-                const material_ground = Material.CreateLambertian(vec3.fromValues(0.8, 0.8, 0.0));
-                const material_center = Material.CreateLambertian(vec3.fromValues(0.1, 0.2, 0.5));
-                const material_left = Material.CreateDieletric(1.5);
-                const material_right = Material.CreateMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
-
-                const materials = Merge(material_ground.buffer, material_center.buffer, material_left.buffer, material_right.buffer);
+                materials.AddLambertian(vec3.fromValues(0.8, 0.8, 0.0));
+                materials.AddLambertian(vec3.fromValues(0.1, 0.2, 0.5));
+                materials.AddDieletric(1.5);
+                materials.AddMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
 
                 this.materialsBuffer = this.device.createBuffer({
-                    size: materials.byteLength,
-                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+                    size: materials.buffer.byteLength,
+                    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_SRC,
                     mappedAtCreation: true,
                 });
-                Copy(materials, this.materialsBuffer.getMappedRange());
+                Copy(materials.buffer, this.materialsBuffer.getMappedRange());
                 this.materialsBuffer.unmap();
             }
 
@@ -222,7 +216,7 @@ export default class Renderer {
                 this.hittableListBuffer.unmap();
             }
 
-            const code = this.computeShader(wgSize, world.count);
+            const code = this.computeShader(wgSize, materials.count, world.count);
             // console.log(code);
             this.pipeline = this.device.createComputePipeline({
                 layout: 'auto',
@@ -304,7 +298,7 @@ export default class Renderer {
         this.queue.submit(commandBuffers);
     };
 
-    computeShader(wgSize: number, numSpheres: number): string {
+    computeShader(wgSize: number, numMaterials: number, numSpheres: number): string {
         const width = this.canvas.width;
         const height = this.canvas.height;
 
@@ -433,8 +427,10 @@ struct material {
     dielectric: dielectric_material
 }
 
+const NUM_MATERIALS = ${numMaterials};
+
 @group(0) @binding(${this.bindings.materials})
-var<storage> materials: array<material>;
+var<uniform> materials: array<material, NUM_MATERIALS>;
 
 
 // For the input ray and hit on the input material, returns true if the ray bounces, and if so,
