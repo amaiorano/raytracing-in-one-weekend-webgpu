@@ -138,6 +138,9 @@ export default class Renderer {
         hittable_list: 2,
     }
 
+    materials: Materials;
+    hittableList: HittableList;
+
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
     }
@@ -146,6 +149,59 @@ export default class Renderer {
         if (await this.initializeAPI()) {
             await this.onResize();
         }
+    }
+
+    createScene1() {
+        this.materials = new Materials();
+        this.materials.AddLambertian(vec3.fromValues(0.8, 0.8, 0.0));
+        this.materials.AddLambertian(vec3.fromValues(0.1, 0.2, 0.5));
+        this.materials.AddDieletric(1.5);
+        this.materials.AddMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
+
+        this.hittableList = new HittableList();
+        this.hittableList.AddSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
+        this.hittableList.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+        this.hittableList.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+        this.hittableList.AddSphere(vec3.fromValues(-1.0, 0.0, -1.0), 0.5, 2);
+        this.hittableList.AddSphere(vec3.fromValues(-1.0, 0.0, -1.0), -0.4, 2);
+        this.hittableList.AddSphere(vec3.fromValues(1.0, 0.0, -1.0), 0.5, 3);
+    }
+
+    updatePipeline(wgSize: number) {
+        this.materialsBuffer = this.device.createBuffer({
+            size: this.materials.buffer.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        Copy(this.materials.buffer, this.materialsBuffer.getMappedRange());
+        this.materialsBuffer.unmap();
+
+        this.hittableListBuffer = this.device.createBuffer({
+            size: this.hittableList.buffer.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        Copy(this.hittableList.buffer, this.hittableListBuffer.getMappedRange());
+        this.hittableListBuffer.unmap();
+
+        const code = this.computeShader(wgSize, this.materials.count, this.hittableList.count);
+        // console.log(code);
+        this.pipeline = this.device.createComputePipeline({
+            layout: 'auto',
+            compute: {
+                module: this.device.createShaderModule({ code: code }),
+                entryPoint: 'main',
+            }
+        });
+
+        this.bindGroup = this.device.createBindGroup({
+            layout: this.pipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: this.bindings.output, resource: { buffer: this.outputBuffer } },
+                { binding: this.bindings.materials, resource: { buffer: this.materialsBuffer } },
+                { binding: this.bindings.hittable_list, resource: { buffer: this.hittableListBuffer } },
+            ],
+        });
     }
 
     async initializeAPI(): Promise<boolean> {
@@ -180,60 +236,8 @@ export default class Renderer {
                 // this.outputBuffer.unmap();
             }
 
-            // Materials buffer
-            let materials = new Materials();
-            {
-                materials.AddLambertian(vec3.fromValues(0.8, 0.8, 0.0));
-                materials.AddLambertian(vec3.fromValues(0.1, 0.2, 0.5));
-                materials.AddDieletric(1.5);
-                materials.AddMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
-
-                this.materialsBuffer = this.device.createBuffer({
-                    size: materials.buffer.byteLength,
-                    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_SRC,
-                    mappedAtCreation: true,
-                });
-                Copy(materials.buffer, this.materialsBuffer.getMappedRange());
-                this.materialsBuffer.unmap();
-            }
-
-            // HittableList buffer
-            let world = new HittableList();
-            {
-                world.AddSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
-                world.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
-                world.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
-                world.AddSphere(vec3.fromValues(-1.0, 0.0, -1.0), 0.5, 2);
-                world.AddSphere(vec3.fromValues(-1.0, 0.0, -1.0), -0.4, 2);
-                world.AddSphere(vec3.fromValues(1.0, 0.0, -1.0), 0.5, 3);
-
-                this.hittableListBuffer = this.device.createBuffer({
-                    size: world.buffer.byteLength,
-                    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_SRC,
-                    mappedAtCreation: true,
-                });
-                Copy(world.buffer, this.hittableListBuffer.getMappedRange());
-                this.hittableListBuffer.unmap();
-            }
-
-            const code = this.computeShader(wgSize, materials.count, world.count);
-            // console.log(code);
-            this.pipeline = this.device.createComputePipeline({
-                layout: 'auto',
-                compute: {
-                    module: this.device.createShaderModule({ code: code }),
-                    entryPoint: 'main',
-                }
-            });
-
-            this.bindGroup = this.device.createBindGroup({
-                layout: this.pipeline.getBindGroupLayout(0),
-                entries: [
-                    { binding: this.bindings.output, resource: { buffer: this.outputBuffer } },
-                    { binding: this.bindings.materials, resource: { buffer: this.materialsBuffer } },
-                    { binding: this.bindings.hittable_list, resource: { buffer: this.hittableListBuffer } },
-                ],
-            });
+            this.createScene1();
+            this.updatePipeline(wgSize);
 
         } catch (e) {
             console.error(e);
@@ -261,39 +265,36 @@ export default class Renderer {
     render(dt: number) {
         let commandBuffers = Array<GPUCommandBuffer>();
 
-        // Run the compute shader
-        {
-            const computeEncoder = this.device.createCommandEncoder();
-
-            const pass = computeEncoder.beginComputePass();
-            pass.setPipeline(this.pipeline);
-            pass.setBindGroup(0, this.bindGroup);
-            pass.dispatchWorkgroups(this.numGroups);
-            pass.end();
-
-            commandBuffers.push(computeEncoder.finish());
+        if (this.pipeline === undefined) {
+            return;
         }
 
-        {
-            const renderEncoder = this.device.createCommandEncoder();
+        const encoder = this.device.createCommandEncoder();
 
-            const colorTexture = this.context.getCurrentTexture();
-            const imageCopyBuffer: GPUImageCopyBuffer = {
-                buffer: this.outputBuffer,
-                rowsPerImage: this.canvas.height,
-                bytesPerRow: this.canvas.width * 4,
-            };
-            const imageCopyTexture: GPUImageCopyTexture = {
-                texture: colorTexture
-            };
-            const extent: GPUExtent3D = {
-                width: this.canvas.width,
-                height: this.canvas.height
-            };
-            renderEncoder.copyBufferToTexture(imageCopyBuffer, imageCopyTexture, extent);
+        const pass = encoder.beginComputePass();
+        pass.setPipeline(this.pipeline);
+        pass.setBindGroup(0, this.bindGroup);
+        pass.dispatchWorkgroups(this.numGroups);
+        pass.end();
 
-            commandBuffers.push(renderEncoder.finish());
-        }
+        // Copy output from compute shader to canvas
+        const colorTexture = this.context.getCurrentTexture();
+        const imageCopyBuffer: GPUImageCopyBuffer = {
+            buffer: this.outputBuffer,
+            rowsPerImage: this.canvas.height,
+            bytesPerRow: this.canvas.width * 4,
+        };
+        const imageCopyTexture: GPUImageCopyTexture = {
+            texture: colorTexture
+        };
+        const extent: GPUExtent3D = {
+            width: this.canvas.width,
+            height: this.canvas.height
+        };
+        encoder.copyBufferToTexture(imageCopyBuffer, imageCopyTexture, extent);
+
+        commandBuffers.push(encoder.finish());
+
 
         this.queue.submit(commandBuffers);
     };
