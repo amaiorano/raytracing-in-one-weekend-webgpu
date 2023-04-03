@@ -1669,8 +1669,7 @@ var Renderer = /*#__PURE__*/function () {
               });
               Copy(world.buffer, this.hittableListBuffer.getMappedRange());
               this.hittableListBuffer.unmap();
-              code = this.computeShader(wgSize, materials.count, world.count);
-              console.log(code);
+              code = this.computeShader(wgSize, materials.count, world.count); // console.log(code);
               this.pipeline = this.device.createComputePipeline({
                 layout: 'auto',
                 compute: {
@@ -1699,20 +1698,20 @@ var Renderer = /*#__PURE__*/function () {
                   }
                 }]
               });
-              _context2.next = 46;
+              _context2.next = 45;
               break;
-            case 42:
-              _context2.prev = 42;
+            case 41:
+              _context2.prev = 41;
               _context2.t0 = _context2["catch"](0);
               console.error(_context2.t0);
               return _context2.abrupt("return", false);
-            case 46:
+            case 45:
               return _context2.abrupt("return", true);
-            case 47:
+            case 46:
             case "end":
               return _context2.stop();
           }
-        }, _callee2, this, [[0, 42]]);
+        }, _callee2, this, [[0, 41]]);
       }));
       function initializeAPI() {
         return _initializeAPI.apply(this, arguments);
