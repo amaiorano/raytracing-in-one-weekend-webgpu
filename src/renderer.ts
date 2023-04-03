@@ -9,21 +9,18 @@ function Buf2Hex(buffer: ArrayBuffer): string {
 };
 
 function Merge(...buffers: ArrayBuffer[]): ArrayBuffer {
-    let size = 0;
-    let offsets = [];
-    buffers.forEach((b, i) => {
-        size += b.byteLength;
-        offsets[i] = (i == 0) ? 0 : offsets[i - 1] + b.byteLength;
-    });
+    let size = buffers.reduce((p, b) => p + b.byteLength, 0);
     let merged = new Uint8Array(size);
+    let offset = 0;
     buffers.forEach((b, i) => {
-        merged.set(new Uint8Array(b), offsets[i]);
+        merged.set(new Uint8Array(b), offset);
+        offset += b.byteLength;
     });
     return merged;
 }
 
-function Copy(src: ArrayBuffer, dst: ArrayBuffer) {
-    new Uint8Array(dst).set(new Uint8Array(src));
+function Copy(src: ArrayBuffer, dst: ArrayBuffer, offset?: number) {
+    new Uint8Array(dst, offset).set(new Uint8Array(src));
 }
 
 class Material {
@@ -88,6 +85,40 @@ class Material {
     }
 }
 
+class HittableList {
+    // /*            align(16) size(32) */ struct sphere {
+    // /* offset( 0) align(16) size(12) */   center : vec3<f32>;
+    // /* offset(12) align( 4) size( 4) */   radius : f32;
+    // /* offset(16) align( 4) size( 4) */   mat : u32;
+    // /* offset(20) align( 1) size(12) */   // -- implicit struct size padding --;
+    // /*                               */ };
+
+    // /*             align(16) size(336) */ struct hittable_list {
+    // /* offset(  0) align(16) size(320) */   spheres : array<sphere, 10>;
+    // /* offset(320) align( 4) size(  4) */   spheres_size : u32;
+    // /* offset(324) align( 1) size( 12) */   // -- implicit struct size padding --;
+    // /*                                 */ };
+    buffer: ArrayBuffer
+
+    AddSphere(center: vec3, radius: number, mat: number) {
+        if (this.buffer === undefined) {
+            this.buffer = new ArrayBuffer(336);
+        }
+        let count = new Uint32Array(this.buffer, 320)[0];
+
+        const s = new ArrayBuffer(32);
+        new Float32Array(s, 0).set([center[0], center[1], center[2]]);
+        new Float32Array(s, 12).set([radius]);
+        new Uint32Array(s, 16).set([mat]);
+
+        // this.buffer = Merge(this.buffer, s);
+        Copy(s, this.buffer, count * 32);
+
+        // TODO: Get rid of count and use dynamic array for spheres
+        new Uint32Array(this.buffer, 320).set([count + 1]);
+    }
+}
+
 export default class Renderer {
     canvas: HTMLCanvasElement;
 
@@ -105,9 +136,11 @@ export default class Renderer {
     numGroups: number;
     outputBuffer: GPUBuffer;
     materialsBuffer: GPUBuffer;
+    hittableListBuffer: GPUBuffer;
     bindings = {
         output: 0,
         materials: 1,
+        hittable_list: 2,
     }
 
     constructor(canvas: HTMLCanvasElement) {
@@ -180,11 +213,31 @@ export default class Renderer {
                 this.materialsBuffer.unmap();
             }
 
+            // HittableList buffer
+            {
+                let world = new HittableList();
+                world.AddSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
+                world.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+                world.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+                world.AddSphere(vec3.fromValues(-1.0, 0.0, -1.0), 0.5, 2);
+                world.AddSphere(vec3.fromValues(-1.0, 0.0, -1.0), -0.4, 2);
+                world.AddSphere(vec3.fromValues(1.0, 0.0, -1.0), 0.5, 3);
+
+                this.hittableListBuffer = this.device.createBuffer({
+                    size: world.buffer.byteLength,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+                    mappedAtCreation: true,
+                });
+                Copy(world.buffer, this.hittableListBuffer.getMappedRange());
+                this.hittableListBuffer.unmap();
+            }
+
             this.bindGroup = this.device.createBindGroup({
                 layout: this.pipeline.getBindGroupLayout(0),
                 entries: [
                     { binding: this.bindings.output, resource: { buffer: this.outputBuffer } },
                     { binding: this.bindings.materials, resource: { buffer: this.materialsBuffer } },
+                    { binding: this.bindings.hittable_list, resource: { buffer: this.hittableListBuffer } },
                 ],
             });
 
@@ -488,18 +541,16 @@ struct hittable_list {
     spheres_size: u32,
 }
 
-fn hittable_list_add_sphere(list: ptr<function, hittable_list>, s: sphere) {
-    (*list).spheres[(*list).spheres_size] = s;
-    (*list).spheres_size += 1;
-}
+@group(0) @binding(${this.bindings.hittable_list})
+var<storage> world: hittable_list;
 
-fn hittable_list_hit(list: ptr<function, hittable_list>, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {
+fn hittable_list_hit(r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {
     var temp_rec: hit_record;
     var hit_anything = false;
     var closest_so_far = t_max;
 
-    for (var i = 0u; i < (*list).spheres_size; i += 1u) {
-        let s = ((*list).spheres)[i];
+    for (var i = 0u; i < world.spheres_size; i += 1u) {
+        let s = world.spheres[i];
         // TODO: remove once we pass in this data as uniform
         if (s.radius == 0.0) {
             continue;
@@ -606,7 +657,7 @@ var<storage, read_write> output : array<u32>;
 const infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf
 const pi = 3.1415926535897932385;
 
-fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) -> color {
+fn ray_color(in_r: ray, in_max_depth: i32) -> color {
     // Book uses recursion for bouncing rays. We can't recurse in WGSL, so convert algorithm to procedural.
     var r = in_r;
     var c : color = color(1,1,1);
@@ -614,7 +665,7 @@ fn ray_color(in_r: ray, world: ptr<function, hittable_list>, in_max_depth: i32) 
     var max_depth = in_max_depth;
 
     while (true) {
-        if (hittable_list_hit(world, r, 0.001, infinity, &rec)) {
+        if (hittable_list_hit(r, 0.001, infinity, &rec)) {
            var attenuation: color;
            var scattered: ray;
             if (material_scatter(rec.mat, r, rec, &attenuation, &scattered)) {
@@ -678,15 +729,6 @@ fn main(
         // Image
         const aspect_ratio = ${width}f / ${height}f;
 
-        // World
-        var world: hittable_list;
-
-        hittable_list_add_sphere(&world, sphere(vec3( 0.0, -100.5, -1.0), 100.0, 0));
-        hittable_list_add_sphere(&world, sphere(vec3( 0.0,    0.0, -1.0),   0.5, 1));
-        hittable_list_add_sphere(&world, sphere(vec3(-1.0,    0.0, -1.0),   0.5, 2));
-        hittable_list_add_sphere(&world, sphere(vec3(-1.0,    0.0, -1.0),  -0.4, 2));
-        hittable_list_add_sphere(&world, sphere(vec3( 1.0,    0.0, -1.0),   0.5, 3));
-
         // Camera
         let lookfrom = vec3f(3,3,2);
         let lookat = vec3f(0,0,-1);
@@ -711,7 +753,7 @@ fn main(
             let u = (x + random_f32()) / (image_width - 1);
             let v = (y + random_f32()) / (image_height - 1);
             let r = camera_get_ray(&cam, u, v);
-            pixel_color += ray_color(r, &world, max_depth);
+            pixel_color += ray_color(r, max_depth);
         }
 
         // Store color for current pixel
