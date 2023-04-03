@@ -1,5 +1,93 @@
 /// <reference types="@webgpu/types" />
 
+import { vec3 } from 'gl-matrix'
+
+function Buf2Hex(buffer: ArrayBuffer): string {
+    return [...new Uint8Array(buffer)]
+        .map((x, i) => ((i % 4 == 0) ? '\n' : '') + x.toString(16).padStart(2, '0'))
+        .join(' ');
+};
+
+function Merge(...buffers: ArrayBuffer[]): ArrayBuffer {
+    let size = 0;
+    let offsets = [];
+    buffers.forEach((b, i) => {
+        size += b.byteLength;
+        offsets[i] = (i == 0) ? 0 : offsets[i - 1] + b.byteLength;
+    });
+    let merged = new Uint8Array(size);
+    buffers.forEach((b, i) => {
+        merged.set(new Uint8Array(b), offsets[i]);
+    });
+    return merged;
+}
+
+function Copy(src: ArrayBuffer, dst: ArrayBuffer) {
+    new Uint8Array(dst).set(new Uint8Array(src));
+}
+
+class Material {
+    // /*            align(16) size(16) */ struct lambertian_material {
+    // /* offset( 0) align(16) size(12) */   albedo : vec3<f32>;
+    // /* offset(12) align( 1) size( 4) */   // -- implicit struct size padding --;
+    // /*                               */ };
+
+    // /*            align(16) size(16) */ struct metal_material {
+    // /* offset( 0) align(16) size(12) */   albedo : vec3<f32>;
+    // /* offset(12) align( 4) size( 4) */   fuzz : f32;
+    // /*                               */ };
+
+    // /*           align(4) size(4) */ struct dielectric_material {
+    // /* offset(0) align(4) size(4) */   ir : f32;
+    // /*                            */ };
+
+    // /*            align(16) size(64) */ struct material {
+    // /* offset( 0) align( 4) size( 4) */   ty : u32;
+    // /* offset( 4) align( 1) size(12) */   // -- implicit field alignment padding --;
+    // /* offset(16) align(16) size(16) */   lambertian : lambertian_material;
+    // /* offset(32) align(16) size(16) */   metal : metal_material;
+    // /* offset(48) align( 4) size( 4) */   dielectric : dielectric_material;
+    // /* offset(52) align( 1) size(12) */   // -- implicit struct size padding --;
+    // /*                               */ };
+    buffer: ArrayBuffer
+
+    static CreateLambertian(albedo: vec3): Material {
+        let m = new Material;
+        m.buffer = new ArrayBuffer(64);
+        // ty
+        new Uint32Array(m.buffer, 0).set([0]);
+        // lambertian_material
+        new Float32Array(m.buffer, 16).set([
+            albedo[0], albedo[1], albedo[2]
+        ]);
+        return m;
+    }
+
+    static CreateMetal(albedo: vec3, fuzz: number): Material {
+        let m = new Material;
+        m.buffer = new ArrayBuffer(64);
+        // ty
+        new Uint32Array(m.buffer, 0).set([1]);
+        // metal_material
+        new Float32Array(m.buffer, 32).set([
+            albedo[0], albedo[1], albedo[2], fuzz
+        ]);
+        return m;
+    }
+
+    static CreateDieletric(ir: number): Material {
+        let m = new Material;
+        m.buffer = new ArrayBuffer(64);
+        // ty
+        new Uint32Array(m.buffer, 0).set([2]);
+        // dielectric_material
+        new Float32Array(m.buffer, 48).set([
+            ir
+        ]);
+        return m;
+    }
+}
+
 export default class Renderer {
     canvas: HTMLCanvasElement;
 
@@ -14,8 +102,13 @@ export default class Renderer {
     // Compute vars
     pipeline: GPUComputePipeline;
     bindGroup: GPUBindGroup;
-    outputBuffer: GPUBuffer;
     numGroups: number;
+    outputBuffer: GPUBuffer;
+    materialsBuffer: GPUBuffer;
+    bindings = {
+        output: 0,
+        materials: 1,
+    }
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -44,31 +137,55 @@ export default class Renderer {
             const height = this.canvas.height;
             this.numGroups = (width * height) / wgSize;
 
+            const code = this.computeShader(wgSize);
+
             this.pipeline = this.device.createComputePipeline({
                 layout: 'auto',
                 compute: {
-                    module: this.device.createShaderModule({ code: this.computeShader(wgSize) }),
-                    entryPoint: 'main'
+                    module: this.device.createShaderModule({ code: code }),
+                    entryPoint: 'main',
                 }
             });
 
-            // Allocate a buffer to hold the output
-            const bufferNumElements = width * height;
-            this.outputBuffer = this.device.createBuffer({
-                size: bufferNumElements * Uint32Array.BYTES_PER_ELEMENT,
-                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-                // mappedAtCreation: true,
-            });
-            // const data = new Uint32Array(this.outputBuffer.getMappedRange());
-            // for (let i = 0; i < bufferNumElements; ++i) {
-            //     data[i] = 0xFF0000FF;
-            // }
-            // this.outputBuffer.unmap();
+            // Output buffer
+            {
+                const bufferNumElements = width * height;
+                this.outputBuffer = this.device.createBuffer({
+                    size: bufferNumElements * Uint32Array.BYTES_PER_ELEMENT,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+                    // mappedAtCreation: true,
+                });
+                // const data = new Uint32Array(this.outputBuffer.getMappedRange());
+                // for (let i = 0; i < bufferNumElements; ++i) {
+                //     data[i] = 0xFF0000FF;
+                // }
+                // this.outputBuffer.unmap();
+            }
 
+            // Materials buffer
+            {
+                const material_ground = Material.CreateLambertian(vec3.fromValues(0.8, 0.8, 0.0));
+                const material_center = Material.CreateLambertian(vec3.fromValues(0.1, 0.2, 0.5));
+                const material_left = Material.CreateDieletric(1.5);
+                const material_right = Material.CreateMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
+
+                const materials = Merge(material_ground.buffer, material_center.buffer, material_left.buffer, material_right.buffer);
+
+                this.materialsBuffer = this.device.createBuffer({
+                    size: materials.byteLength,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+                    mappedAtCreation: true,
+                });
+                Copy(materials, this.materialsBuffer.getMappedRange());
+                this.materialsBuffer.unmap();
+            }
 
             this.bindGroup = this.device.createBindGroup({
                 layout: this.pipeline.getBindGroupLayout(0),
-                entries: [{ binding: 0, resource: { buffer: this.outputBuffer } }],
+                entries: [
+                    { binding: this.bindings.output, resource: { buffer: this.outputBuffer } },
+                    { binding: this.bindings.materials, resource: { buffer: this.materialsBuffer } },
+                ],
             });
 
         } catch (e) {
@@ -139,6 +256,11 @@ export default class Renderer {
         const height = this.canvas.height;
 
         const wgsl = `
+///////////////////////////////////////////////////////////////////////////////
+// Common
+alias material_index = u32;
+///////////////////////////////////////////////////////////////////////////////
+
 ///////////////////////////////////////////////////////////////////////////////
 // Ray
 
@@ -216,7 +338,7 @@ struct hit_record {
     normal: vec3f,
     t: f32,
     front_face: bool,
-    mat: material,
+    mat: material_index,
 }
 
 fn hit_record_set_face_normal(rec: ptr<function, hit_record>, r: ray, outward_normal: vec3f) {
@@ -238,7 +360,7 @@ const MATERIAL_METAL:       material_type = 1;
 const MATERIAL_DIELECTRIC:  material_type = 2;
 
 struct lambertian_material {
-    albedo : color,
+    albedo: color,
 }
 
 struct metal_material {
@@ -251,37 +373,21 @@ struct dielectric_material {
 }
 
 struct material {
-    // NOTE: ideally we'd use a discrimination union
+    // NOTE: ideally we'd use a discriminated union
     ty: material_type,
     lambertian: lambertian_material,
     metal: metal_material,
     dielectric: dielectric_material
 }
 
-fn material_create_lambertian(albedo: color) -> material {
-    var m: material;
-    m.ty = MATERIAL_LAMBERTIAN;
-    m.lambertian = lambertian_material(albedo);
-    return m;
-}
+@group(0) @binding(${this.bindings.materials})
+var<storage> materials: array<material>;
 
-fn material_create_metal(albedo: color, fuzz: f32) -> material {
-    var m: material;
-    m.ty = MATERIAL_METAL;
-    m.metal = metal_material(albedo, fuzz);
-    return m;
-}
-
-fn material_create_dielectric(ir: f32) -> material {
-    var m: material;
-    m.ty = MATERIAL_DIELECTRIC;
-    m.dielectric = dielectric_material(ir);
-    return m;
-}
 
 // For the input ray and hit on the input material, returns true if the ray bounces, and if so,
 // stores the color contribution (attenuation) from this material and the new bounce (scatter) ray.
-fn material_scatter(m: material, r_in: ray, rec: hit_record, attenuation: ptr<function, color>, scattered: ptr<function, ray>) -> bool {
+fn material_scatter(mat: material_index, r_in: ray, rec: hit_record, attenuation: ptr<function, color>, scattered: ptr<function, ray>) -> bool {
+    let m = materials[mat];
     if (m.ty == MATERIAL_LAMBERTIAN) {
         var scatter_direction = rec.normal + random_unit_vector();
 
@@ -339,7 +445,7 @@ fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
 struct sphere {
     center: vec3f,
     radius: f32,
-    mat: material, // TODO: index into storage buffer of materials
+    mat: material_index,
 }
 
 fn sphere_hit(s: sphere, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {
@@ -494,7 +600,7 @@ fn random_range_vec3f(min: f32, max: f32) -> vec3f {
 ///////////////////////////////////////////////////////////////////////////////
 // Main
 
-@group(0) @binding(0)
+@group(0) @binding(${this.bindings.output})
 var<storage, read_write> output : array<u32>;
 
 const infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf
@@ -575,16 +681,11 @@ fn main(
         // World
         var world: hittable_list;
 
-        let material_ground = material_create_lambertian(color(0.8, 0.8, 0.0));
-        let material_center = material_create_lambertian(color(0.1, 0.2, 0.5));
-        let material_left = material_create_dielectric(1.5);
-        let material_right = material_create_metal(color(0.8, 0.6, 0.2), 0.0);
-
-        hittable_list_add_sphere(&world, sphere(vec3( 0.0, -100.5, -1.0), 100.0, material_ground));
-        hittable_list_add_sphere(&world, sphere(vec3( 0.0,    0.0, -1.0),   0.5, material_center));
-        hittable_list_add_sphere(&world, sphere(vec3(-1.0,    0.0, -1.0),   0.5, material_left));
-        hittable_list_add_sphere(&world, sphere(vec3(-1.0,    0.0, -1.0),  -0.4, material_left));
-        hittable_list_add_sphere(&world, sphere(vec3( 1.0,    0.0, -1.0),   0.5, material_right));
+        hittable_list_add_sphere(&world, sphere(vec3( 0.0, -100.5, -1.0), 100.0, 0));
+        hittable_list_add_sphere(&world, sphere(vec3( 0.0,    0.0, -1.0),   0.5, 1));
+        hittable_list_add_sphere(&world, sphere(vec3(-1.0,    0.0, -1.0),   0.5, 2));
+        hittable_list_add_sphere(&world, sphere(vec3(-1.0,    0.0, -1.0),  -0.4, 2));
+        hittable_list_add_sphere(&world, sphere(vec3( 1.0,    0.0, -1.0),   0.5, 3));
 
         // Camera
         let lookfrom = vec3f(3,3,2);
