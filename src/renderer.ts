@@ -93,29 +93,25 @@ class HittableList {
     // /* offset(20) align( 1) size(12) */   // -- implicit struct size padding --;
     // /*                               */ };
 
-    // /*             align(16) size(336) */ struct hittable_list {
-    // /* offset(  0) align(16) size(320) */   spheres : array<sphere, 10>;
-    // /* offset(320) align( 4) size(  4) */   spheres_size : u32;
-    // /* offset(324) align( 1) size( 12) */   // -- implicit struct size padding --;
+    // /*             align(16) size(???) */ struct hittable_list {
+    // /* offset(  0) align(16) size(???) */   spheres : array<sphere, ?>;
     // /*                                 */ };
     buffer: ArrayBuffer
+    numSpheres: number = 0;
 
     AddSphere(center: vec3, radius: number, mat: number) {
-        if (this.buffer === undefined) {
-            this.buffer = new ArrayBuffer(336);
-        }
-        let count = new Uint32Array(this.buffer, 320)[0];
-
         const s = new ArrayBuffer(32);
         new Float32Array(s, 0).set([center[0], center[1], center[2]]);
         new Float32Array(s, 12).set([radius]);
         new Uint32Array(s, 16).set([mat]);
 
-        // this.buffer = Merge(this.buffer, s);
-        Copy(s, this.buffer, count * 32);
+        if (this.buffer === undefined) {
+            this.buffer = s;
+        } else {
+            this.buffer = Merge(this.buffer, s);
+        }
 
-        // TODO: Get rid of count and use dynamic array for spheres
-        new Uint32Array(this.buffer, 320).set([count + 1]);
+        this.numSpheres += 1;
     }
 }
 
@@ -170,16 +166,6 @@ export default class Renderer {
             const height = this.canvas.height;
             this.numGroups = (width * height) / wgSize;
 
-            const code = this.computeShader(wgSize);
-
-            this.pipeline = this.device.createComputePipeline({
-                layout: 'auto',
-                compute: {
-                    module: this.device.createShaderModule({ code: code }),
-                    entryPoint: 'main',
-                }
-            });
-
             // Output buffer
             {
                 const bufferNumElements = width * height;
@@ -214,8 +200,8 @@ export default class Renderer {
             }
 
             // HittableList buffer
+            let world = new HittableList();
             {
-                let world = new HittableList();
                 world.AddSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
                 world.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
                 world.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
@@ -225,12 +211,22 @@ export default class Renderer {
 
                 this.hittableListBuffer = this.device.createBuffer({
                     size: world.buffer.byteLength,
-                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+                    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_SRC,
                     mappedAtCreation: true,
                 });
                 Copy(world.buffer, this.hittableListBuffer.getMappedRange());
                 this.hittableListBuffer.unmap();
             }
+
+            const code = this.computeShader(wgSize, world.numSpheres);
+            // console.log(code);
+            this.pipeline = this.device.createComputePipeline({
+                layout: 'auto',
+                compute: {
+                    module: this.device.createShaderModule({ code: code }),
+                    entryPoint: 'main',
+                }
+            });
 
             this.bindGroup = this.device.createBindGroup({
                 layout: this.pipeline.getBindGroupLayout(0),
@@ -304,7 +300,7 @@ export default class Renderer {
         this.queue.submit(commandBuffers);
     };
 
-    computeShader(wgSize: number): string {
+    computeShader(wgSize: number, numSpheres: number): string {
         const width = this.canvas.width;
         const height = this.canvas.height;
 
@@ -501,11 +497,12 @@ struct sphere {
     mat: material_index,
 }
 
-fn sphere_hit(s: sphere, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {
-    let oc = r.orig - s.center;
+fn sphere_hit(sphere_index: u32, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {
+    let s = &world.spheres[sphere_index];
+    let oc = r.orig - (*s).center;
     let a = length_squared(r.dir);
     let half_b = dot(oc, r.dir);
-    let c = length_squared(oc) - s.radius*s.radius;
+    let c = length_squared(oc) - (*s).radius*(*s).radius;
     let discriminant = half_b*half_b - a*c;
 
     if (discriminant < 0) {
@@ -525,9 +522,9 @@ fn sphere_hit(s: sphere, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_
 
     (*rec).t = root;
     (*rec).p = ray_at(r, (*rec).t);
-    let outward_normal = ((*rec).p - s.center) / s.radius;
+    let outward_normal = ((*rec).p - (*s).center) / (*s).radius;
     hit_record_set_face_normal(rec, r, outward_normal);
-    (*rec).mat = s.mat;
+    (*rec).mat = (*s).mat;
 
     return true;
 }
@@ -535,27 +532,22 @@ fn sphere_hit(s: sphere, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_
 
 ///////////////////////////////////////////////////////////////////////////////
 // Hittable List
-const MAX_NUM_SPHERES = 10;
+const NUM_SPHERES = ${numSpheres};
 struct hittable_list {
-    spheres: array<sphere, MAX_NUM_SPHERES>, // TODO: remove fixed size, make this a uniform input struct
-    spheres_size: u32,
+    spheres: array<sphere, NUM_SPHERES>,
 }
 
 @group(0) @binding(${this.bindings.hittable_list})
-var<storage> world: hittable_list;
+var<uniform> world: hittable_list;
 
 fn hittable_list_hit(r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {
     var temp_rec: hit_record;
     var hit_anything = false;
     var closest_so_far = t_max;
 
-    for (var i = 0u; i < world.spheres_size; i += 1u) {
-        let s = world.spheres[i];
-        // TODO: remove once we pass in this data as uniform
-        if (s.radius == 0.0) {
-            continue;
-        }
-        if (sphere_hit(s, r, t_min, closest_so_far, &temp_rec)) {
+    for (var i = 0u; i < NUM_SPHERES; i += 1u) {
+        let s = &world.spheres[i];
+        if (sphere_hit(i, r, t_min, closest_so_far, &temp_rec)) {
             hit_anything = true;
             closest_so_far = temp_rec.t;
             *rec = temp_rec;
