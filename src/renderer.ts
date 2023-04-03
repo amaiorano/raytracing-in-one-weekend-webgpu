@@ -23,6 +23,20 @@ function Copy(src: ArrayBuffer, dst: ArrayBuffer, offset?: number) {
     new Uint8Array(dst, offset).set(new Uint8Array(src));
 }
 
+class DynamicBuffer {
+    buffer: ArrayBuffer
+    count = 0
+
+    protected Add(in_buffer: ArrayBuffer) {
+        if (this.buffer === undefined) {
+            this.buffer = in_buffer;
+        } else {
+            this.buffer = Merge(this.buffer, in_buffer);
+        }
+        this.count += 1;
+    }
+}
+
 class Material {
     // /*            align(16) size(16) */ struct lambertian_material {
     // /* offset( 0) align(16) size(12) */   albedo : vec3<f32>;
@@ -85,7 +99,7 @@ class Material {
     }
 }
 
-class HittableList {
+class HittableList extends DynamicBuffer {
     // /*            align(16) size(32) */ struct sphere {
     // /* offset( 0) align(16) size(12) */   center : vec3<f32>;
     // /* offset(12) align( 4) size( 4) */   radius : f32;
@@ -96,22 +110,12 @@ class HittableList {
     // /*             align(16) size(???) */ struct hittable_list {
     // /* offset(  0) align(16) size(???) */   spheres : array<sphere, ?>;
     // /*                                 */ };
-    buffer: ArrayBuffer
-    numSpheres: number = 0;
-
     AddSphere(center: vec3, radius: number, mat: number) {
         const s = new ArrayBuffer(32);
         new Float32Array(s, 0).set([center[0], center[1], center[2]]);
         new Float32Array(s, 12).set([radius]);
         new Uint32Array(s, 16).set([mat]);
-
-        if (this.buffer === undefined) {
-            this.buffer = s;
-        } else {
-            this.buffer = Merge(this.buffer, s);
-        }
-
-        this.numSpheres += 1;
+        this.Add(s);
     }
 }
 
@@ -218,7 +222,7 @@ export default class Renderer {
                 this.hittableListBuffer.unmap();
             }
 
-            const code = this.computeShader(wgSize, world.numSpheres);
+            const code = this.computeShader(wgSize, world.count);
             // console.log(code);
             this.pipeline = this.device.createComputePipeline({
                 layout: 'auto',
