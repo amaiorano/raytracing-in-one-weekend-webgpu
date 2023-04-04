@@ -1523,32 +1523,30 @@ var Materials = /*#__PURE__*/function (_DynamicBuffer) {
     // /* offset(52) align( 1) size(12) */   // -- implicit struct size padding --;
     // /*                               */ };
     function addLambertian(albedo) {
-      var m = new ArrayBuffer(64);
+      var b = new ArrayBuffer(64);
+      var w = new BufferWriter(b);
       // ty
-      new Uint32Array(m, 0).set([0]);
-      // lambertian_material
-      new Float32Array(m, 16).set([albedo[0], albedo[1], albedo[2]]);
-      this.add(m);
+      w.setU32(0, 0); // ty
+      w.setVec3f(16, albedo);
+      this.add(b);
     }
   }, {
     key: "addMetal",
     value: function addMetal(albedo, fuzz) {
-      var m = new ArrayBuffer(64);
-      // ty
-      new Uint32Array(m, 0).set([1]);
-      // metal_material
-      new Float32Array(m, 32).set([albedo[0], albedo[1], albedo[2], fuzz]);
-      this.add(m);
+      var b = new ArrayBuffer(64);
+      var w = new BufferWriter(b);
+      w.setU32(0, 1); // ty
+      w.setVec3f(32, albedo);
+      this.add(b);
     }
   }, {
     key: "addDieletric",
     value: function addDieletric(ir) {
-      var m = new ArrayBuffer(64);
-      // ty
-      new Uint32Array(m, 0).set([2]);
-      // dielectric_material
-      new Float32Array(m, 48).set([ir]);
-      this.add(m);
+      var b = new ArrayBuffer(64);
+      var w = new BufferWriter(b);
+      w.setU32(0, 2); // ty
+      w.setF32(48, ir);
+      this.add(b);
     }
   }]);
   return Materials;
@@ -1574,11 +1572,12 @@ var HittableList = /*#__PURE__*/function (_DynamicBuffer2) {
     // /* offset(  0) align(16) size(???) */   spheres : array<sphere, ?>;
     // /*                                 */ };
     function addSphere(center, radius, mat) {
-      var s = new ArrayBuffer(32);
-      new Float32Array(s, 0).set([center[0], center[1], center[2]]);
-      new Float32Array(s, 12).set([radius]);
-      new Uint32Array(s, 16).set([mat]);
-      this.add(s);
+      var b = new ArrayBuffer(32);
+      var w = new BufferWriter(b);
+      w.setVec3f(0, center);
+      w.setF32(12, radius);
+      w.setU32(16, mat);
+      this.add(b);
     }
   }]);
   return HittableList;
