@@ -9,7 +9,7 @@ class App {
 
     constructor(canvas: HTMLCanvasElement) {
         const aspect_ratio = 16 / 9;
-        canvas.width = 64 * 13;
+        canvas.width = 64 * 10;
         canvas.height = canvas.width / aspect_ratio;
         this.canvas = canvas;
         this.renderer = new Renderer(canvas);
