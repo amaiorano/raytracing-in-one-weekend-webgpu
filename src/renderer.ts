@@ -23,11 +23,36 @@ function Copy(src: ArrayBuffer, dst: ArrayBuffer, offset?: number) {
     new Uint8Array(dst, offset).set(new Uint8Array(src));
 }
 
+class BufferWriter {
+    buffer: ArrayBuffer
+    constructor(buffer: ArrayBuffer) {
+        this.buffer = buffer;
+    }
+
+    setU32(offset: number, v: number) {
+        new Uint32Array(this.buffer, offset).set([v]);
+    }
+
+    setI32(offset: number, v: number) {
+        new Int32Array(this.buffer, offset).set([v]);
+    }
+
+    setF32(offset: number, v: number) {
+        new Float32Array(this.buffer, offset).set([v]);
+    }
+
+    setVec3f(offset: number, v: vec3) {
+        new Float32Array(this.buffer, offset).set([
+            v[0], v[1], v[2]
+        ]);
+    }
+}
+
 class DynamicBuffer {
     buffer: ArrayBuffer
     count = 0
 
-    protected Add(in_buffer: ArrayBuffer) {
+    protected add(in_buffer: ArrayBuffer) {
         if (this.buffer === undefined) {
             this.buffer = in_buffer;
         } else {
@@ -60,37 +85,29 @@ class Materials extends DynamicBuffer {
     // /* offset(48) align( 4) size( 4) */   dielectric : dielectric_material;
     // /* offset(52) align( 1) size(12) */   // -- implicit struct size padding --;
     // /*                               */ };
-    AddLambertian(albedo: vec3) {
-        const m = new ArrayBuffer(64);
+    addLambertian(albedo: vec3) {
+        const b = new ArrayBuffer(64);
+        const w = new BufferWriter(b);
         // ty
-        new Uint32Array(m, 0).set([0]);
-        // lambertian_material
-        new Float32Array(m, 16).set([
-            albedo[0], albedo[1], albedo[2]
-        ]);
-        this.Add(m);
+        w.setU32(0, 0); // ty
+        w.setVec3f(16, albedo);
+        this.add(b);
     }
 
-    AddMetal(albedo: vec3, fuzz: number) {
-        const m = new ArrayBuffer(64);
-        // ty
-        new Uint32Array(m, 0).set([1]);
-        // metal_material
-        new Float32Array(m, 32).set([
-            albedo[0], albedo[1], albedo[2], fuzz
-        ]);
-        this.Add(m);
+    addMetal(albedo: vec3, fuzz: number) {
+        const b = new ArrayBuffer(64);
+        const w = new BufferWriter(b);
+        w.setU32(0, 1); // ty
+        w.setVec3f(32, albedo);
+        this.add(b);
     }
 
-    AddDieletric(ir: number) {
-        const m = new ArrayBuffer(64);
-        // ty
-        new Uint32Array(m, 0).set([2]);
-        // dielectric_material
-        new Float32Array(m, 48).set([
-            ir
-        ]);
-        this.Add(m);
+    addDieletric(ir: number) {
+        const b = new ArrayBuffer(64);
+        const w = new BufferWriter(b);
+        w.setU32(0, 2); // ty
+        w.setF32(48, ir);
+        this.add(b);
     }
 }
 
@@ -105,12 +122,72 @@ class HittableList extends DynamicBuffer {
     // /*             align(16) size(???) */ struct hittable_list {
     // /* offset(  0) align(16) size(???) */   spheres : array<sphere, ?>;
     // /*                                 */ };
-    AddSphere(center: vec3, radius: number, mat: number) {
-        const s = new ArrayBuffer(32);
-        new Float32Array(s, 0).set([center[0], center[1], center[2]]);
-        new Float32Array(s, 12).set([radius]);
-        new Uint32Array(s, 16).set([mat]);
-        this.Add(s);
+    addSphere(center: vec3, radius: number, mat: number) {
+        const b = new ArrayBuffer(32);
+        const w = new BufferWriter(b);
+        w.setVec3f(0, center);
+        w.setF32(12, radius);
+        w.setU32(16, mat);
+        this.add(b);
+    }
+}
+
+class CameraCreateParams {
+    // /*            align(16) size(64) */ struct camera_create_params {
+    // /* offset( 0) align(16) size(12) */   lookfrom : vec3<f32>;
+    // /* offset(12) align( 1) size( 4) */   // -- implicit field alignment padding --;
+    // /* offset(16) align(16) size(12) */   lookat : vec3<f32>;
+    // /* offset(28) align( 1) size( 4) */   // -- implicit field alignment padding --;
+    // /* offset(32) align(16) size(12) */   vup : vec3<f32>;
+    // /* offset(44) align( 4) size( 4) */   vfov : f32;
+    // /* offset(48) align( 4) size( 4) */   aspect_ratio : f32;
+    // /* offset(52) align( 4) size( 4) */   aperture : f32;
+    // /* offset(56) align( 4) size( 4) */   focus_dist : f32;
+    // /* offset(60) align( 1) size( 4) */   // -- implicit struct size padding --;
+    // /*                               */ };
+    buffer: ArrayBuffer
+    private writer: BufferWriter
+
+    constructor() {
+        this.buffer = new ArrayBuffer(112);
+        this.writer = new BufferWriter(this.buffer);
+        // Set some useful defaults
+        this.lookfrom(vec3.fromValues(0, 0, 0));
+        this.lookat(vec3.fromValues(0, 0, -1));
+        this.vup(vec3.fromValues(0, 1, 0));
+        this.vfov(20.0);
+        this.aspect_ratio(16.0 / 9.0);
+        this.aperture(2.0);
+        this.focus_dist(1.0);
+    }
+
+    lookfrom(v: vec3): CameraCreateParams {
+        this.writer.setVec3f(0, v);
+        return this;
+    }
+    lookat(v: vec3): CameraCreateParams {
+        this.writer.setVec3f(16, v);
+        return this;
+    }
+    vup(v: vec3): CameraCreateParams {
+        this.writer.setVec3f(32, v);
+        return this;
+    }
+    vfov(v: number): CameraCreateParams {
+        this.writer.setF32(44, v);
+        return this;
+    }
+    aspect_ratio(v: number): CameraCreateParams {
+        this.writer.setF32(48, v);
+        return this;
+    }
+    aperture(v: number): CameraCreateParams {
+        this.writer.setF32(52, v);
+        return this;
+    }
+    focus_dist(v: number): CameraCreateParams {
+        this.writer.setF32(56, v);
+        return this;
     }
 }
 
@@ -132,14 +209,17 @@ export default class Renderer {
     outputBuffer: GPUBuffer;
     materialsBuffer: GPUBuffer;
     hittableListBuffer: GPUBuffer;
+    cameraCreateParamsBuffer: GPUBuffer;
     bindings = {
         output: 0,
         materials: 1,
         hittable_list: 2,
+        camera_create_params: 3
     }
 
     materials: Materials;
     hittableList: HittableList;
+    cameraCreateParams: CameraCreateParams;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -153,18 +233,32 @@ export default class Renderer {
 
     createScene1() {
         this.materials = new Materials();
-        this.materials.AddLambertian(vec3.fromValues(0.8, 0.8, 0.0));
-        this.materials.AddLambertian(vec3.fromValues(0.1, 0.2, 0.5));
-        this.materials.AddDieletric(1.5);
-        this.materials.AddMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
+        this.materials.addLambertian(vec3.fromValues(0.8, 0.8, 0.0));
+        this.materials.addLambertian(vec3.fromValues(0.1, 0.2, 0.5));
+        this.materials.addDieletric(1.5);
+        this.materials.addMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
 
         this.hittableList = new HittableList();
-        this.hittableList.AddSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
-        this.hittableList.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
-        this.hittableList.AddSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
-        this.hittableList.AddSphere(vec3.fromValues(-1.0, 0.0, -1.0), 0.5, 2);
-        this.hittableList.AddSphere(vec3.fromValues(-1.0, 0.0, -1.0), -0.4, 2);
-        this.hittableList.AddSphere(vec3.fromValues(1.0, 0.0, -1.0), 0.5, 3);
+        this.hittableList.addSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
+        this.hittableList.addSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+        this.hittableList.addSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+        this.hittableList.addSphere(vec3.fromValues(-1.0, 0.0, -1.0), 0.5, 2);
+        this.hittableList.addSphere(vec3.fromValues(-1.0, 0.0, -1.0), -0.4, 2);
+        this.hittableList.addSphere(vec3.fromValues(1.0, 0.0, -1.0), 0.5, 3);
+
+        const lookfrom = vec3.fromValues(3, 3, 2);
+        const lookat = vec3.fromValues(0, 0, -1);
+        let delta = vec3.create();
+        vec3.sub(delta, lookat, lookfrom);
+        const focus_dist = vec3.length(delta);
+        this.cameraCreateParams = new CameraCreateParams()
+            .lookfrom(lookfrom)
+            .lookat(lookat)
+            .vup(vec3.fromValues(0, 1, 0))
+            .focus_dist(focus_dist)
+            .aperture(2.0)
+            .vfov(20.0)
+            .aspect_ratio(this.canvas.width / this.canvas.height);
     }
 
     updatePipeline(wgSize: number) {
@@ -184,6 +278,14 @@ export default class Renderer {
         Copy(this.hittableList.buffer, this.hittableListBuffer.getMappedRange());
         this.hittableListBuffer.unmap();
 
+        this.cameraCreateParamsBuffer = this.device.createBuffer({
+            size: this.hittableList.buffer.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        Copy(this.cameraCreateParams.buffer, this.cameraCreateParamsBuffer.getMappedRange());
+        this.cameraCreateParamsBuffer.unmap();
+
         const code = this.computeShader(wgSize, this.materials.count, this.hittableList.count);
         // console.log(code);
         this.pipeline = this.device.createComputePipeline({
@@ -200,6 +302,7 @@ export default class Renderer {
                 { binding: this.bindings.output, resource: { buffer: this.outputBuffer } },
                 { binding: this.bindings.materials, resource: { buffer: this.materialsBuffer } },
                 { binding: this.bindings.hittable_list, resource: { buffer: this.hittableListBuffer } },
+                { binding: this.bindings.camera_create_params, resource: { buffer: this.cameraCreateParamsBuffer } },
             ],
         });
     }
@@ -560,6 +663,17 @@ fn hittable_list_hit(r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_reco
 
 ///////////////////////////////////////////////////////////////////////////////
 // Camera
+
+struct camera_create_params {
+    lookfrom: vec3f,
+    lookat: vec3f,
+    vup : vec3f,
+    vfov: f32, // vertical field-of-view in degrees
+    aspect_ratio: f32,
+    aperture : f32,
+    focus_dist: f32
+}
+
 struct camera {
     origin: vec3f,
     lower_left_corner: vec3f,
@@ -571,30 +685,22 @@ struct camera {
     lens_radius : f32,
 }
 
-fn camera_create(
-        lookfrom: vec3f,
-        lookat: vec3f,
-        vup : vec3f,
-        vfov: f32, // vertical field-of-view in degrees
-        aspect_ratio: f32,
-        aperture : f32,
-        focus_dist: f32
-        ) -> camera {
-    let theta = radians(vfov);
+fn camera_create(p: camera_create_params) -> camera {
+    let theta = radians(p.vfov);
     let h = tan(theta/2);
     let viewport_height = 2.0 * h;
-    let viewport_width = aspect_ratio * viewport_height;
+    let viewport_width = p.aspect_ratio * viewport_height;
 
     // Note: vup, v, and w are all in the same plane
-    let w = normalize(lookfrom - lookat);
-    let u = normalize(cross(vup, w));
+    let w = normalize(p.lookfrom - p.lookat);
+    let u = normalize(cross(p.vup, w));
     let v = cross(w, u);
 
-    let origin = lookfrom;
-    let horizontal = focus_dist * viewport_width * u;
-    let vertical = focus_dist * viewport_height * v;
-    let lower_left_corner = origin - horizontal/2 - vertical/2 - focus_dist * w;
-    let lens_radius = aperture / 2;
+    let origin = p.lookfrom;
+    let horizontal = p.focus_dist * viewport_width * u;
+    let vertical = p.focus_dist * viewport_height * v;
+    let lower_left_corner = origin - horizontal/2 - vertical/2 - p.focus_dist * w;
+    let lens_radius = p.aperture / 2;
 
     return camera(origin, lower_left_corner, horizontal, vertical, u, v, w, lens_radius);
 }
@@ -646,6 +752,9 @@ fn random_range_vec3f(min: f32, max: f32) -> vec3f {
 
 @group(0) @binding(${this.bindings.output})
 var<storage, read_write> output : array<u32>;
+
+@group(0) @binding(${this.bindings.camera_create_params})
+var<uniform> cp: camera_create_params;
 
 const infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf
 const pi = 3.1415926535897932385;
@@ -719,17 +828,8 @@ fn main(
     ) {
         init_rand(global_invocation_id.x, vec4(vec3f(global_invocation_id), 1.0));
 
-        // Image
-        const aspect_ratio = ${width}f / ${height}f;
-
         // Camera
-        let lookfrom = vec3f(3,3,2);
-        let lookat = vec3f(0,0,-1);
-        let vup = vec3f(0,1,0);
-        let dist_to_focus = length(lookfrom - lookat);
-        let aperture = 2.0;
-        let vfov = 20.0;
-        var cam = camera_create(lookfrom, lookat, vup, vfov, aspect_ratio, aperture, dist_to_focus);
+        var cam = camera_create(cp);
 
         // Render
         // Compute current x,y
