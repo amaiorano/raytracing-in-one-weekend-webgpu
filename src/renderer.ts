@@ -86,30 +86,33 @@ class Materials extends DynamicBuffer {
     // /* offset(48) align( 4) size( 4) */   dielectric : dielectric_material;
     // /* offset(52) align( 1) size(12) */   // -- implicit struct size padding --;
     // /*                               */ };
-    addLambertian(albedo: vec3) {
+    addLambertian(albedo: vec3): number {
         const b = new ArrayBuffer(64);
         const w = new BufferWriter(b);
         // ty
         w.setU32(0, 0); // ty
         w.setVec3f(16 + 0, albedo);
         this.add(b);
+        return this.count - 1;
     }
 
-    addMetal(albedo: vec3, fuzz: number) {
+    addMetal(albedo: vec3, fuzz: number): number {
         const b = new ArrayBuffer(64);
         const w = new BufferWriter(b);
         w.setU32(0, 1); // ty
         w.setVec3f(32 + 0, albedo);
         w.setF32(32 + 12, fuzz);
         this.add(b);
+        return this.count - 1;
     }
 
-    addDieletric(ir: number) {
+    addDieletric(ir: number): number {
         const b = new ArrayBuffer(64);
         const w = new BufferWriter(b);
         w.setU32(0, 2); // ty
         w.setF32(48 + 0, ir);
         this.add(b);
+        return this.count - 1;
     }
 }
 
@@ -307,7 +310,7 @@ export default class Renderer {
                 .aspect_ratio(this.canvas.width / this.canvas.height);
         }
 
-        if (scene === 16 || scene === 18 || scene === 19) {
+        else if (scene === 16 || scene === 18 || scene === 19) {
             this.materials.addLambertian(vec3.fromValues(0.8, 0.8, 0.0));
             this.materials.addLambertian(vec3.fromValues(0.1, 0.2, 0.5));
             this.materials.addDieletric(1.5);
@@ -349,7 +352,7 @@ export default class Renderer {
                 .aspect_ratio(this.canvas.width / this.canvas.height);
         }
 
-        if (scene === 20) {
+        else if (scene === 20) {
             this.materials.addLambertian(vec3.fromValues(0.8, 0.8, 0.0));
             this.materials.addLambertian(vec3.fromValues(0.1, 0.2, 0.5));
             this.materials.addDieletric(1.5);
@@ -373,6 +376,72 @@ export default class Renderer {
                 .vup(vec3.fromValues(0, 1, 0))
                 .focus_dist(focus_dist)
                 .aperture(2.0)
+                .vfov(20.0)
+                .aspect_ratio(this.canvas.width / this.canvas.height);
+        }
+
+        else if (scene === 21) {
+            const ground_material = this.materials.addLambertian(vec3.fromValues(0.5, 0.5, 0.5));
+            this.hittableList.addSphere(vec3.fromValues(0, -1000, 0), 1000, ground_material);
+
+            const rand = function (min = 0, max = 1) {
+                return (Math.random() * (max - min)) + min;
+            };
+
+            const randomColor = function (min = 0, max = 1) {
+                return vec3.fromValues(rand(min, max), rand(min, max), rand(min, max));
+            };
+
+            for (let a = -11; a < 11; a++) {
+                for (let b = -11; b < 11; b++) {
+                    const choose_mat = Math.random();
+                    const center = vec3.fromValues(a + 0.9 * rand(), 0.2, b + 0.9 * rand())
+
+                    let delta = vec3.create();
+                    vec3.sub(delta, center, vec3.fromValues(4, 0.2, 0));
+                    if (delta.length > 0.9) {
+                        if (choose_mat < 0.8) {
+                            // diffuse
+                            const albedo = vec3.create();
+                            vec3.mul(albedo, randomColor(), randomColor());
+                            const sphere_material = this.materials.addLambertian(albedo);
+                            this.hittableList.addSphere(center, 0.2, sphere_material);
+                        } else if (choose_mat < 0.95) {
+                            // metal
+                            const albedo = randomColor(0.5, 1);
+                            const fuzz = rand(0, 0.5);
+                            const sphere_material = this.materials.addMetal(albedo, fuzz);
+                            this.hittableList.addSphere(center, 0.2, sphere_material);
+                        } else {
+                            // glass
+                            const sphere_material = this.materials.addDieletric(1.5);
+                            this.hittableList.addSphere(center, 0.2, sphere_material);
+                        }
+                    }
+                }
+            }
+
+
+            const material1 = this.materials.addDieletric(1.5);
+            this.hittableList.addSphere(vec3.fromValues(0, 1, 0), 1.0, material1);
+
+            const material2 = this.materials.addLambertian(vec3.fromValues(0.4, 0.2, 0.1));
+            this.hittableList.addSphere(vec3.fromValues(-4, 1, 0), 1.0, material2);
+
+            const material3 = this.materials.addMetal(vec3.fromValues(0.7, 0.6, 0.5), 0.0);
+            this.hittableList.addSphere(vec3.fromValues(4, 1, 0), 1.0, material3);
+
+            const lookfrom = vec3.fromValues(13, 2, 3);
+            const lookat = vec3.fromValues(0, 0, 0);
+            let delta = vec3.create();
+            vec3.sub(delta, lookat, lookfrom);
+            const focus_dist = 10.0;
+            this.cameraCreateParams
+                .lookfrom(lookfrom)
+                .lookat(lookat)
+                .vup(vec3.fromValues(0, 1, 0))
+                .focus_dist(focus_dist)
+                .aperture(0.1)
                 .vfov(20.0)
                 .aspect_ratio(this.canvas.width / this.canvas.height);
         }
@@ -446,6 +515,7 @@ export default class Renderer {
                     'Image 18: A distant view': 18,
                     'Image 19: Image 19: Zooming in': 19,
                     'Image 20: Spheres with depth-of-field': 20,
+                    'Image 21: Final scene': 21,
                 }
             });
         input.on('change', ev => {
