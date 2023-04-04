@@ -445,15 +445,14 @@ fn near_zero(v: vec3f) -> bool {
 }
 
 fn random_in_unit_sphere() -> vec3f {
-    var p : vec3f;
-    while (true) {
-        p = random_range_vec3f(-1, 1);
+    for (var i = 0; i < 1000; i += 1) {
+        let p = random_range_vec3f(-1, 1);
         if (length_squared(p) >= 1) {
             continue;
         }
-        break;
-    }
     return p;
+}
+    return vec3f(0,0,0.3);
 }
 
 fn random_unit_vector() -> vec3f {
@@ -471,15 +470,14 @@ fn random_in_hemisphere(normal: vec3f) -> vec3f {
 }
 
 fn random_in_unit_disk() -> vec3f {
-    var p : vec3f;
-    while (true) {
-        p = vec3f(random_range_f32(-1,1), random_range_f32(-1,1), 0);
+    for (var i = 0; i < 1000; i += 1) {
+        let p = vec3f(random_range_f32(-1,1), random_range_f32(-1,1), 0);
         if (length_squared(p) >= 1) {
             continue;
         }
-        break;
-    }
     return p;
+    }
+    return vec3f(0.3,0,0);
 }
 ///////////////////////////////////////////////////////////////////////////////
 
