@@ -8972,7 +8972,7 @@ var sub = subtract;
  * @function
  */
 
-var mul = (/* unused pure expression or super */ null && (multiply));
+var mul = multiply;
 /**
  * Alias for {@link vec3.divide}
  * @function
@@ -9175,6 +9175,7 @@ var Materials = /*#__PURE__*/function (_DynamicBuffer) {
       w.setU32(0, 0); // ty
       w.setVec3f(16 + 0, albedo);
       this.add(b);
+      return this.count - 1;
     }
   }, {
     key: "addMetal",
@@ -9185,6 +9186,7 @@ var Materials = /*#__PURE__*/function (_DynamicBuffer) {
       w.setVec3f(32 + 0, albedo);
       w.setF32(32 + 12, fuzz);
       this.add(b);
+      return this.count - 1;
     }
   }, {
     key: "addDieletric",
@@ -9194,6 +9196,7 @@ var Materials = /*#__PURE__*/function (_DynamicBuffer) {
       w.setU32(0, 2); // ty
       w.setF32(48 + 0, ir);
       this.add(b);
+      return this.count - 1;
     }
   }]);
   return Materials;
@@ -9353,6 +9356,7 @@ var Renderer = /*#__PURE__*/function () {
       samplesPerPixel: 50,
       maxDepth: 10
     });
+    _defineProperty(this, "dirty", true);
     this.canvas = canvas;
   }
   _createClass(Renderer, [{
@@ -9409,8 +9413,7 @@ var Renderer = /*#__PURE__*/function () {
         sub(delta, _lookat, _lookfrom);
         var focus_dist = vec3_length(delta);
         this.cameraCreateParams.lookfrom(_lookfrom).lookat(_lookat).vup(fromValues(0, 1, 0)).focus_dist(focus_dist).aperture(0.0).vfov(90.0).aspect_ratio(this.canvas.width / this.canvas.height);
-      }
-      if (scene === 16 || scene === 18 || scene === 19) {
+      } else if (scene === 16 || scene === 18 || scene === 19) {
         this.materials.addLambertian(fromValues(0.8, 0.8, 0.0));
         this.materials.addLambertian(fromValues(0.1, 0.2, 0.5));
         this.materials.addDieletric(1.5);
@@ -9440,8 +9443,7 @@ var Renderer = /*#__PURE__*/function () {
         sub(_delta, lookat, lookfrom);
         var _focus_dist = vec3_length(_delta);
         this.cameraCreateParams.lookfrom(lookfrom).lookat(lookat).vup(fromValues(0, 1, 0)).focus_dist(_focus_dist).aperture(0.0).vfov(vfov).aspect_ratio(this.canvas.width / this.canvas.height);
-      }
-      if (scene === 20) {
+      } else if (scene === 20) {
         this.materials.addLambertian(fromValues(0.8, 0.8, 0.0));
         this.materials.addLambertian(fromValues(0.1, 0.2, 0.5));
         this.materials.addDieletric(1.5);
@@ -9458,6 +9460,58 @@ var Renderer = /*#__PURE__*/function () {
         sub(_delta2, _lookat2, _lookfrom2);
         var _focus_dist2 = vec3_length(_delta2);
         this.cameraCreateParams.lookfrom(_lookfrom2).lookat(_lookat2).vup(fromValues(0, 1, 0)).focus_dist(_focus_dist2).aperture(2.0).vfov(20.0).aspect_ratio(this.canvas.width / this.canvas.height);
+      } else if (scene === 21) {
+        var ground_material = this.materials.addLambertian(fromValues(0.5, 0.5, 0.5));
+        this.hittableList.addSphere(fromValues(0, -1000, 0), 1000, ground_material);
+        var rand = function rand() {
+          var min = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+          var max = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+          return Math.random() * (max - min) + min;
+        };
+        var randomColor = function randomColor() {
+          var min = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+          var max = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+          return fromValues(rand(min, max), rand(min, max), rand(min, max));
+        };
+        for (var a = -11; a < 11; a++) {
+          for (var b = -11; b < 11; b++) {
+            var choose_mat = Math.random();
+            var center = fromValues(a + 0.9 * rand(), 0.2, b + 0.9 * rand());
+            var _delta3 = create();
+            sub(_delta3, center, fromValues(4, 0.2, 0));
+            if (_delta3.length > 0.9) {
+              if (choose_mat < 0.8) {
+                // diffuse
+                var albedo = create();
+                mul(albedo, randomColor(), randomColor());
+                var sphere_material = this.materials.addLambertian(albedo);
+                this.hittableList.addSphere(center, 0.2, sphere_material);
+              } else if (choose_mat < 0.95) {
+                // metal
+                var _albedo = randomColor(0.5, 1);
+                var fuzz = rand(0, 0.5);
+                var _sphere_material = this.materials.addMetal(_albedo, fuzz);
+                this.hittableList.addSphere(center, 0.2, _sphere_material);
+              } else {
+                // glass
+                var _sphere_material2 = this.materials.addDieletric(1.5);
+                this.hittableList.addSphere(center, 0.2, _sphere_material2);
+              }
+            }
+          }
+        }
+        var material1 = this.materials.addDieletric(1.5);
+        this.hittableList.addSphere(fromValues(0, 1, 0), 1.0, material1);
+        var material2 = this.materials.addLambertian(fromValues(0.4, 0.2, 0.1));
+        this.hittableList.addSphere(fromValues(-4, 1, 0), 1.0, material2);
+        var material3 = this.materials.addMetal(fromValues(0.7, 0.6, 0.5), 0.0);
+        this.hittableList.addSphere(fromValues(4, 1, 0), 1.0, material3);
+        var _lookfrom3 = fromValues(13, 2, 3);
+        var _lookat3 = fromValues(0, 0, 0);
+        var _delta4 = create();
+        sub(_delta4, _lookat3, _lookfrom3);
+        var _focus_dist3 = 10.0;
+        this.cameraCreateParams.lookfrom(_lookfrom3).lookat(_lookat3).vup(fromValues(0, 1, 0)).focus_dist(_focus_dist3).aperture(0.1).vfov(20.0).aspect_ratio(this.canvas.width / this.canvas.height);
       }
     }
   }, {
@@ -9531,6 +9585,7 @@ var Renderer = /*#__PURE__*/function () {
           }
         }]
       });
+      this.dirty = true;
     }
   }, {
     key: "initTweakPane",
@@ -9546,7 +9601,8 @@ var Renderer = /*#__PURE__*/function () {
           'Image 16: A hollow glass sphere': 16,
           'Image 18: A distant view': 18,
           'Image 19: Image 19: Zooming in': 19,
-          'Image 20: Spheres with depth-of-field': 20
+          'Image 20: Spheres with depth-of-field': 20,
+          'Image 21: Final scene': 21
         }
       });
       input.on('change', function (ev) {
@@ -9682,11 +9738,14 @@ var Renderer = /*#__PURE__*/function () {
         return;
       }
       var encoder = this.device.createCommandEncoder();
-      var pass = encoder.beginComputePass();
-      pass.setPipeline(this.pipeline);
-      pass.setBindGroup(0, this.bindGroup);
-      pass.dispatchWorkgroups(this.numGroups);
-      pass.end();
+      if (this.dirty) {
+        var pass = encoder.beginComputePass();
+        pass.setPipeline(this.pipeline);
+        pass.setBindGroup(0, this.bindGroup);
+        pass.dispatchWorkgroups(this.numGroups);
+        pass.end();
+        this.dirty = false;
+      }
 
       // Copy output from compute shader to canvas
       var colorTexture = this.context.getCurrentTexture();
