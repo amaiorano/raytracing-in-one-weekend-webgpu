@@ -90,7 +90,7 @@ class Materials extends DynamicBuffer {
         const w = new BufferWriter(b);
         // ty
         w.setU32(0, 0); // ty
-        w.setVec3f(16, albedo);
+        w.setVec3f(16 + 0, albedo);
         this.add(b);
     }
 
@@ -98,7 +98,8 @@ class Materials extends DynamicBuffer {
         const b = new ArrayBuffer(64);
         const w = new BufferWriter(b);
         w.setU32(0, 1); // ty
-        w.setVec3f(32, albedo);
+        w.setVec3f(32 + 0, albedo);
+        w.setF32(32 + 12, fuzz);
         this.add(b);
     }
 
@@ -106,7 +107,7 @@ class Materials extends DynamicBuffer {
         const b = new ArrayBuffer(64);
         const w = new BufferWriter(b);
         w.setU32(0, 2); // ty
-        w.setF32(48, ir);
+        w.setF32(48 + 0, ir);
         this.add(b);
     }
 }
