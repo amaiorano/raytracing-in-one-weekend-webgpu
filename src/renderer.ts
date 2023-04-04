@@ -262,6 +262,8 @@ export default class Renderer {
         maxDepth: 10,
     }
 
+    dirty = true;
+
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
     }
@@ -500,6 +502,8 @@ export default class Renderer {
                 { binding: this.bindings.raytracer_config, resource: { buffer: this.raytracerConfigBuffer } },
             ],
         });
+
+        this.dirty = true;
     }
 
     initTweakPane(wgSize: number) {
@@ -608,11 +612,14 @@ export default class Renderer {
 
         const encoder = this.device.createCommandEncoder();
 
-        const pass = encoder.beginComputePass();
-        pass.setPipeline(this.pipeline);
-        pass.setBindGroup(0, this.bindGroup);
-        pass.dispatchWorkgroups(this.numGroups);
-        pass.end();
+        if (this.dirty) {
+            const pass = encoder.beginComputePass();
+            pass.setPipeline(this.pipeline);
+            pass.setBindGroup(0, this.bindGroup);
+            pass.dispatchWorkgroups(this.numGroups);
+            pass.end();
+            this.dirty = false;
+        }
 
         // Copy output from compute shader to canvas
         const colorTexture = this.context.getCurrentTexture();
