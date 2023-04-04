@@ -1,6 +1,7 @@
 /// <reference types="@webgpu/types" />
 
 import { vec3 } from 'gl-matrix'
+import { Pane } from 'tweakpane'
 
 function Buf2Hex(buffer: ArrayBuffer): string {
     return [...new Uint8Array(buffer)]
@@ -158,7 +159,7 @@ class CameraCreateParams {
         this.vup(vec3.fromValues(0, 1, 0));
         this.vfov(20.0);
         this.aspect_ratio(16.0 / 9.0);
-        this.aperture(2.0);
+        this.aperture(0.02);
         this.focus_dist(1.0);
     }
 
@@ -192,8 +193,35 @@ class CameraCreateParams {
     }
 }
 
+class RaytracerConfig {
+    // /*           align(4) size(8) */ struct raytracer_config {
+    // /* offset(0) align(4) size(4) */   samples_per_pixel : u32;
+    // /* offset(4) align(4) size(4) */   max_depth : u32;
+    // /*                            */ };
+
+    buffer: ArrayBuffer;
+    private writer: BufferWriter
+    constructor() {
+        this.buffer = new ArrayBuffer(112);
+        this.writer = new BufferWriter(this.buffer);
+        // Set some useful defaults
+        this.samples_per_pixel(100);
+        this.max_depth(50);
+    }
+
+    samples_per_pixel(v: number): RaytracerConfig {
+        this.writer.setU32(0, v);
+        return this;
+    }
+    max_depth(v: number): RaytracerConfig {
+        this.writer.setU32(4, v);
+        return this;
+    }
+}
+
 export default class Renderer {
     canvas: HTMLCanvasElement;
+    pane: Pane;
 
     // API Data Structures
     adapter: GPUAdapter;
@@ -211,16 +239,25 @@ export default class Renderer {
     materialsBuffer: GPUBuffer;
     hittableListBuffer: GPUBuffer;
     cameraCreateParamsBuffer: GPUBuffer;
+    raytracerConfigBuffer: GPUBuffer;
     bindings = {
         output: 0,
         materials: 1,
         hittable_list: 2,
-        camera_create_params: 3
+        camera_create_params: 3,
+        raytracer_config: 4,
     }
 
     materials: Materials;
     hittableList: HittableList;
     cameraCreateParams: CameraCreateParams;
+    raytracerConfig: RaytracerConfig;
+    // Config vars
+    config = {
+        scene: 1,
+        samplesPerPixel: 50,
+        maxDepth: 10,
+    }
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -232,34 +269,113 @@ export default class Renderer {
         }
     }
 
-    createScene1() {
+    updateScene() {
         this.materials = new Materials();
-        this.materials.addLambertian(vec3.fromValues(0.8, 0.8, 0.0));
-        this.materials.addLambertian(vec3.fromValues(0.1, 0.2, 0.5));
-        this.materials.addDieletric(1.5);
-        this.materials.addMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
-
         this.hittableList = new HittableList();
-        this.hittableList.addSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
-        this.hittableList.addSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
-        this.hittableList.addSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
-        this.hittableList.addSphere(vec3.fromValues(-1.0, 0.0, -1.0), 0.5, 2);
-        this.hittableList.addSphere(vec3.fromValues(-1.0, 0.0, -1.0), -0.4, 2);
-        this.hittableList.addSphere(vec3.fromValues(1.0, 0.0, -1.0), 0.5, 3);
+        this.cameraCreateParams = new CameraCreateParams();
 
-        const lookfrom = vec3.fromValues(3, 3, 2);
-        const lookat = vec3.fromValues(0, 0, -1);
-        let delta = vec3.create();
-        vec3.sub(delta, lookat, lookfrom);
-        const focus_dist = vec3.length(delta);
-        this.cameraCreateParams = new CameraCreateParams()
-            .lookfrom(lookfrom)
-            .lookat(lookat)
-            .vup(vec3.fromValues(0, 1, 0))
-            .focus_dist(focus_dist)
-            .aperture(2.0)
-            .vfov(20.0)
-            .aspect_ratio(this.canvas.width / this.canvas.height);
+        const scene = this.config.scene;
+
+        if (scene === 11 || scene === 12) {
+            this.materials.addLambertian(vec3.fromValues(0.8, 0.8, 0.0));
+            this.materials.addLambertian(vec3.fromValues(0.7, 0.3, 0.3));
+            if (scene == 11) {
+                this.materials.addMetal(vec3.fromValues(0.8, 0.8, 0.8), 0.0);
+                this.materials.addMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
+            } else {
+                this.materials.addMetal(vec3.fromValues(0.8, 0.8, 0.8), 0.3);
+                this.materials.addMetal(vec3.fromValues(0.8, 0.6, 0.2), 1.0);
+            }
+
+            this.hittableList.addSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
+            this.hittableList.addSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+            this.hittableList.addSphere(vec3.fromValues(-1.0, 0.0, -1.0), 0.5, 2);
+            this.hittableList.addSphere(vec3.fromValues(1.0, 0.0, -1.0), 0.5, 3);
+
+            const lookfrom = vec3.fromValues(0, 0, 0);
+            const lookat = vec3.fromValues(0, 0, -1);
+            let delta = vec3.create();
+            vec3.sub(delta, lookat, lookfrom);
+            const focus_dist = vec3.length(delta);
+            this.cameraCreateParams
+                .lookfrom(lookfrom)
+                .lookat(lookat)
+                .vup(vec3.fromValues(0, 1, 0))
+                .focus_dist(focus_dist)
+                .aperture(0.0)
+                .vfov(90.0)
+                .aspect_ratio(this.canvas.width / this.canvas.height);
+        }
+
+        if (scene === 16 || scene === 18 || scene === 19) {
+            this.materials.addLambertian(vec3.fromValues(0.8, 0.8, 0.0));
+            this.materials.addLambertian(vec3.fromValues(0.1, 0.2, 0.5));
+            this.materials.addDieletric(1.5);
+            this.materials.addMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
+
+            this.hittableList.addSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
+            this.hittableList.addSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+            this.hittableList.addSphere(vec3.fromValues(-1.0, 0.0, -1.0), 0.5, 2);
+            this.hittableList.addSphere(vec3.fromValues(-1.0, 0.0, -1.0), -0.4, 2);
+            this.hittableList.addSphere(vec3.fromValues(1.0, 0.0, -1.0), 0.5, 3);
+
+            var lookfrom: vec3;
+            var lookat: vec3;
+            var vfov: number;
+            if (scene === 16) {
+                lookfrom = vec3.fromValues(0, 0, 0);
+                lookat = vec3.fromValues(0, 0, -1);
+                vfov = 90;
+            } else if (scene === 18) {
+                lookfrom = vec3.fromValues(-2, 2, 1);
+                lookat = vec3.fromValues(0, 0, -1);
+                vfov = 90;
+            } else if (scene === 19) {
+                lookfrom = vec3.fromValues(-2, 2, 1);
+                lookat = vec3.fromValues(0, 0, -1);
+                vfov = 20;
+            }
+
+            let delta = vec3.create();
+            vec3.sub(delta, lookat, lookfrom);
+            const focus_dist = vec3.length(delta);
+            this.cameraCreateParams
+                .lookfrom(lookfrom)
+                .lookat(lookat)
+                .vup(vec3.fromValues(0, 1, 0))
+                .focus_dist(focus_dist)
+                .aperture(0.0)
+                .vfov(vfov)
+                .aspect_ratio(this.canvas.width / this.canvas.height);
+        }
+
+        if (scene === 20) {
+            this.materials.addLambertian(vec3.fromValues(0.8, 0.8, 0.0));
+            this.materials.addLambertian(vec3.fromValues(0.1, 0.2, 0.5));
+            this.materials.addDieletric(1.5);
+            this.materials.addMetal(vec3.fromValues(0.8, 0.6, 0.2), 0.0);
+
+            this.hittableList.addSphere(vec3.fromValues(0.0, -100.5, -1.0), 100.0, 0);
+            this.hittableList.addSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+            this.hittableList.addSphere(vec3.fromValues(0.0, 0.0, -1.0), 0.5, 1);
+            this.hittableList.addSphere(vec3.fromValues(-1.0, 0.0, -1.0), 0.5, 2);
+            this.hittableList.addSphere(vec3.fromValues(-1.0, 0.0, -1.0), -0.4, 2);
+            this.hittableList.addSphere(vec3.fromValues(1.0, 0.0, -1.0), 0.5, 3);
+
+            const lookfrom = vec3.fromValues(3, 3, 2);
+            const lookat = vec3.fromValues(0, 0, -1);
+            let delta = vec3.create();
+            vec3.sub(delta, lookat, lookfrom);
+            const focus_dist = vec3.length(delta);
+            this.cameraCreateParams
+                .lookfrom(lookfrom)
+                .lookat(lookat)
+                .vup(vec3.fromValues(0, 1, 0))
+                .focus_dist(focus_dist)
+                .aperture(2.0)
+                .vfov(20.0)
+                .aspect_ratio(this.canvas.width / this.canvas.height);
+        }
     }
 
     updatePipeline(wgSize: number) {
@@ -280,12 +396,20 @@ export default class Renderer {
         this.hittableListBuffer.unmap();
 
         this.cameraCreateParamsBuffer = this.device.createBuffer({
-            size: this.hittableList.buffer.byteLength,
+            size: this.cameraCreateParams.buffer.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true,
         });
         Copy(this.cameraCreateParams.buffer, this.cameraCreateParamsBuffer.getMappedRange());
         this.cameraCreateParamsBuffer.unmap();
+
+        this.raytracerConfigBuffer = this.device.createBuffer({
+            size: this.raytracerConfig.buffer.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        Copy(this.raytracerConfig.buffer, this.raytracerConfigBuffer.getMappedRange());
+        this.raytracerConfigBuffer.unmap();
 
         const code = this.computeShader(wgSize, this.materials.count, this.hittableList.count);
         // console.log(code);
@@ -304,8 +428,46 @@ export default class Renderer {
                 { binding: this.bindings.materials, resource: { buffer: this.materialsBuffer } },
                 { binding: this.bindings.hittable_list, resource: { buffer: this.hittableListBuffer } },
                 { binding: this.bindings.camera_create_params, resource: { buffer: this.cameraCreateParamsBuffer } },
+                { binding: this.bindings.raytracer_config, resource: { buffer: this.raytracerConfigBuffer } },
             ],
         });
+    }
+
+    initTweakPane(wgSize: number) {
+        this.raytracerConfig = new RaytracerConfig();
+        this.pane = new Pane;
+
+        let input = this.pane.addInput(this.config, 'scene',
+            {
+                label: 'Scene', options: {
+                    'Image 11: Shiny metal': 11,
+                    'Image 12: Fuzzed metal': 12,
+                    'Image 16: A hollow glass sphere': 16,
+                    'Image 18: A distant view': 18,
+                    'Image 19: Image 19: Zooming in': 19,
+                    'Image 20: Spheres with depth-of-field': 20,
+                }
+            });
+        input.on('change', ev => {
+            this.updateScene();
+            this.updatePipeline(wgSize); // TODO: queue.copy
+        });
+
+        input = this.pane.addInput(this.config, 'samplesPerPixel',
+            { label: 'Samples Per Pixel', min: 1, max: 100, step: 1 });
+        input.on('change', ev => {
+            this.raytracerConfig.samples_per_pixel(ev.value)
+            this.updatePipeline(wgSize); // TODO: queue.copy
+        });
+
+        input = this.pane.addInput(this.config, 'maxDepth',
+            { label: 'Max Ray Depth', min: 2, max: 20, step: 1 });
+        input.on('change', ev => {
+            this.raytracerConfig.max_depth(ev.value)
+            this.updatePipeline(wgSize); // TODO: queue.copy
+        });
+
+        this.config.scene = 11;
     }
 
     async initializeAPI(): Promise<boolean> {
@@ -340,7 +502,8 @@ export default class Renderer {
                 // this.outputBuffer.unmap();
             }
 
-            this.createScene1();
+            this.initTweakPane(wgSize);
+            this.updateScene();
             this.updatePipeline(wgSize);
 
         } catch (e) {
@@ -450,8 +613,8 @@ fn random_in_unit_sphere() -> vec3f {
         if (length_squared(p) >= 1) {
             continue;
         }
-    return p;
-}
+        return p;
+    }
     return vec3f(0,0,0.3);
 }
 
@@ -475,7 +638,7 @@ fn random_in_unit_disk() -> vec3f {
         if (length_squared(p) >= 1) {
             continue;
         }
-    return p;
+        return p;
     }
     return vec3f(0.3,0,0);
 }
@@ -728,9 +891,10 @@ fn init_rand(invocation_id : u32, seed : vec4<f32>) {
 
 // Returns random value in [0.0, 1.0)
 fn random_f32() -> f32 {
-  rand_seed.x = fract(cos(dot(rand_seed, vec2<f32>(23.14077926, 232.61690225))) * 136.8168);
-  rand_seed.y = fract(cos(dot(rand_seed, vec2<f32>(54.47856553, 345.84153136))) * 534.7645);
-  return rand_seed.y;
+    // return 0.0f;
+    rand_seed.x = fract(cos(dot(rand_seed, vec2<f32>(23.14077926, 232.61690225))) * 136.8168);
+    rand_seed.y = fract(cos(dot(rand_seed, vec2<f32>(54.47856553, 345.84153136))) * 534.7645);
+    return rand_seed.y;
 }
 
 fn random_range_f32(min: f32, max: f32) -> f32 {
@@ -746,7 +910,7 @@ fn random_range_vec3f(min: f32, max: f32) -> vec3f {
 }
 ///////////////////////////////////////////////////////////////////////////////
 
-///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////y////////////////////////
 // Main
 
 @group(0) @binding(${this.bindings.output})
@@ -755,10 +919,17 @@ var<storage, read_write> output : array<u32>;
 @group(0) @binding(${this.bindings.camera_create_params})
 var<uniform> cp: camera_create_params;
 
+struct raytracer_config {
+    samples_per_pixel: u32,
+    max_depth: u32
+}
+@group(0) @binding(${this.bindings.raytracer_config})
+var<uniform> config: raytracer_config;
+
 const infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf
 const pi = 3.1415926535897932385;
 
-fn ray_color(in_r: ray, in_max_depth: i32) -> color {
+fn ray_color(in_r: ray, in_max_depth: u32) -> color {
     // Book uses recursion for bouncing rays. We can't recurse in WGSL, so convert algorithm to procedural.
     var r = in_r;
     var c : color = color(1,1,1);
@@ -837,11 +1008,12 @@ fn main(
         let y = ${height} - f32(offset / ${width}); // Flip Y so Y+ is up
         const image_height = ${height};
         const image_width = ${width};
-        const samples_per_pixel = 100;
-        const max_depth = 50;
+        
+        let samples_per_pixel = config.samples_per_pixel;
+        let max_depth = config.max_depth;
 
         var pixel_color = color(0.0, 0.0, 0.0);
-        for (var i = 0; i < samples_per_pixel; i += 1) {
+        for (var i = 0u; i < samples_per_pixel; i += 1u) {
             let u = (x + random_f32()) / (image_width - 1);
             let v = (y + random_f32()) / (image_height - 1);
             let r = camera_get_ray(&cam, u, v);
