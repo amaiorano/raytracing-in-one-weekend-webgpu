@@ -9315,8 +9315,8 @@ var RaytracerConfig = /*#__PURE__*/function () {
     this.buffer = new ArrayBuffer(112);
     this.writer = new BufferWriter(this.buffer);
     // Set some useful defaults
-    this.samples_per_pixel(100);
-    this.max_depth(50);
+    this.samples_per_pixel(25);
+    this.max_depth(10);
   }
   _createClass(RaytracerConfig, [{
     key: "samples_per_pixel",
@@ -9353,7 +9353,7 @@ var Renderer = /*#__PURE__*/function () {
     });
     _defineProperty(this, "config", {
       scene: 1,
-      samplesPerPixel: 50,
+      samplesPerPixel: 25,
       maxDepth: 10
     });
     _defineProperty(this, "dirty", true);
@@ -9508,8 +9508,6 @@ var Renderer = /*#__PURE__*/function () {
         this.hittableList.addSphere(fromValues(4, 1, 0), 1.0, material3);
         var _lookfrom3 = fromValues(13, 2, 3);
         var _lookat3 = fromValues(0, 0, 0);
-        var _delta4 = create();
-        sub(_delta4, _lookat3, _lookfrom3);
         var _focus_dist3 = 10.0;
         this.cameraCreateParams.lookfrom(_lookfrom3).lookat(_lookat3).vup(fromValues(0, 1, 0)).focus_dist(_focus_dist3).aperture(0.1).vfov(20.0).aspect_ratio(this.canvas.width / this.canvas.height);
       }
@@ -9613,7 +9611,7 @@ var Renderer = /*#__PURE__*/function () {
       input = this.pane.addInput(this.config, 'samplesPerPixel', {
         label: 'Samples Per Pixel',
         min: 1,
-        max: 100,
+        max: 50,
         step: 1
       });
       input.on('change', function (ev) {
