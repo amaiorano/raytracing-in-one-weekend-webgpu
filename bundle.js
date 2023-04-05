@@ -9828,6 +9828,7 @@ var App = /*#__PURE__*/function () {
     _classCallCheck(this, App);
     _defineProperty(this, "elapsedTime", 0);
     _defineProperty(this, "keysPressed", {});
+    // Set canvas size to largets possible resolution (see Renderer.initTweakPane)
     var aspectRatio = 16 / 9;
     canvas.width = 64 * 20;
     canvas.height = canvas.width / aspectRatio;
