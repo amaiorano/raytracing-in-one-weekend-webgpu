@@ -222,8 +222,18 @@ class RaytracerConfig {
     }
 }
 
+class Dims {
+    constructor(width = 0, height = 0) {
+        this.width = width;
+        this.height = height;
+    }
+    width: number
+    height: number
+}
+
 export default class Renderer {
     canvas: HTMLCanvasElement;
+    renderDims: Dims;
     pane: Pane;
 
     // API Data Structures
@@ -255,8 +265,10 @@ export default class Renderer {
     hittableList: HittableList;
     cameraCreateParams: CameraCreateParams;
     raytracerConfig: RaytracerConfig;
+
     // Config vars
     config = {
+        resolutionIndex: 0, // Set to list of [width, height]
         scene: 1,
         samplesPerPixel: 25,
         maxDepth: 10,
@@ -266,6 +278,7 @@ export default class Renderer {
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
+        this.renderDims = new Dims(canvas.width, canvas.height);
     }
 
     async init() {
@@ -309,7 +322,7 @@ export default class Renderer {
                 .focus_dist(focus_dist)
                 .aperture(0.0)
                 .vfov(90.0)
-                .aspect_ratio(this.canvas.width / this.canvas.height);
+                .aspect_ratio(this.renderDims.width / this.renderDims.height);
         }
 
         else if (scene === 16 || scene === 18 || scene === 19) {
@@ -351,7 +364,7 @@ export default class Renderer {
                 .focus_dist(focus_dist)
                 .aperture(0.0)
                 .vfov(vfov)
-                .aspect_ratio(this.canvas.width / this.canvas.height);
+                .aspect_ratio(this.renderDims.width / this.renderDims.height);
         }
 
         else if (scene === 20) {
@@ -379,7 +392,7 @@ export default class Renderer {
                 .focus_dist(focus_dist)
                 .aperture(2.0)
                 .vfov(20.0)
-                .aspect_ratio(this.canvas.width / this.canvas.height);
+                .aspect_ratio(this.renderDims.width / this.renderDims.height);
         }
 
         else if (scene === 21) {
@@ -443,7 +456,7 @@ export default class Renderer {
                 .focus_dist(focus_dist)
                 .aperture(0.1)
                 .vfov(20.0)
-                .aspect_ratio(this.canvas.width / this.canvas.height);
+                .aspect_ratio(this.renderDims.width / this.renderDims.height);
         }
     }
 
@@ -508,7 +521,39 @@ export default class Renderer {
         this.raytracerConfig = new RaytracerConfig();
         this.pane = new Pane;
 
-        let input = this.pane.addInput(this.config, 'scene',
+        // Resolution
+        let resolutions: number[][] = [];
+        let resolutionsNames: any = {}
+        const aspectRatio = this.canvas.width / this.canvas.height;
+        for (let i = 1; i < 18; ++i) {
+            const w = 64 * (i + 2);
+            const h = w / aspectRatio;
+            resolutionsNames[`${w}x${h}`] = i - 1;
+            resolutions.push([w, h]);
+        }
+
+        const updateResolution = () => {
+            const index = this.config.resolutionIndex;
+            this.renderDims.width = resolutions[index][0];
+            this.renderDims.height = resolutions[index][1];
+        };
+
+        // Set default resolution index
+        this.config.resolutionIndex = 7;
+        updateResolution();
+
+        let input = this.pane.addInput(this.config, 'resolutionIndex',
+            {
+                label: 'Resolution', options: resolutionsNames,
+            });
+        input.on('change', () => {
+            updateResolution();
+            this.updateScene();
+            this.updatePipeline(wgSize); // TODO: queue.copy
+        });
+
+        // Scene
+        input = this.pane.addInput(this.config, 'scene',
             {
                 label: 'Scene', options: {
                     'Image 11: Shiny metal': 11,
@@ -555,8 +600,8 @@ export default class Renderer {
             this.queue = this.device.queue;
 
             const wgSize = 256;
-            const width = this.canvas.width;
-            const height = this.canvas.height;
+            const width = this.renderDims.width;
+            const height = this.renderDims.height;
             this.numGroups = (width * height) / wgSize;
 
             // Output buffer
@@ -623,15 +668,15 @@ export default class Renderer {
         const colorTexture = this.context.getCurrentTexture();
         const imageCopyBuffer: GPUImageCopyBuffer = {
             buffer: this.outputBuffer,
-            rowsPerImage: this.canvas.height,
-            bytesPerRow: this.canvas.width * 4,
+            rowsPerImage: this.renderDims.height,
+            bytesPerRow: this.renderDims.width * 4,
         };
         const imageCopyTexture: GPUImageCopyTexture = {
             texture: colorTexture
         };
         const extent: GPUExtent3D = {
-            width: this.canvas.width,
-            height: this.canvas.height
+            width: this.renderDims.width,
+            height: this.renderDims.height
         };
         encoder.copyBufferToTexture(imageCopyBuffer, imageCopyTexture, extent);
 
@@ -642,8 +687,8 @@ export default class Renderer {
     };
 
     computeShader(wgSize: number, numMaterials: number, numSpheres: number): string {
-        const width = this.canvas.width;
-        const height = this.canvas.height;
+        const width = this.renderDims.width;
+        const height = this.renderDims.height;
 
         const wgsl = `
 ///////////////////////////////////////////////////////////////////////////////
