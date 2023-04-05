@@ -9346,6 +9346,8 @@ var Renderer = /*#__PURE__*/function () {
   // Frame Backings
 
   // Compute vars
+  // Size of each workgroup
+  // Number of workgroups to dispatch
 
   // Config vars
 
@@ -9524,7 +9526,7 @@ var Renderer = /*#__PURE__*/function () {
     }
   }, {
     key: "updatePipeline",
-    value: function updatePipeline(wgSize) {
+    value: function updatePipeline() {
       this.materialsBuffer = this.device.createBuffer({
         size: this.materials.buffer.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -9553,7 +9555,7 @@ var Renderer = /*#__PURE__*/function () {
       });
       Copy(this.raytracerConfig.buffer, this.raytracerConfigBuffer.getMappedRange());
       this.raytracerConfigBuffer.unmap();
-      var code = this.computeShader(wgSize, this.materials.count, this.hittableList.count);
+      var code = this.computeShader(this.wgSize, this.materials.count, this.hittableList.count);
       // console.log(code);
       this.pipeline = this.device.createComputePipeline({
         layout: 'auto',
@@ -9597,7 +9599,7 @@ var Renderer = /*#__PURE__*/function () {
     }
   }, {
     key: "initTweakPane",
-    value: function initTweakPane(wgSize) {
+    value: function initTweakPane() {
       var _this = this;
       this.raytracerConfig = new RaytracerConfig();
       this.pane = new tweakpane.Pane();
@@ -9628,7 +9630,7 @@ var Renderer = /*#__PURE__*/function () {
       input.on('change', function () {
         updateResolution();
         _this.updateScene();
-        _this.updatePipeline(wgSize); // TODO: queue.copy
+        _this.updatePipeline(); // TODO: queue.copy
       });
 
       // Scene
@@ -9646,7 +9648,7 @@ var Renderer = /*#__PURE__*/function () {
       });
       input.on('change', function (ev) {
         _this.updateScene();
-        _this.updatePipeline(wgSize); // TODO: queue.copy
+        _this.updatePipeline(); // TODO: queue.copy
       });
 
       input = this.pane.addInput(this.config, 'samplesPerPixel', {
@@ -9657,7 +9659,7 @@ var Renderer = /*#__PURE__*/function () {
       });
       input.on('change', function (ev) {
         _this.raytracerConfig.samples_per_pixel(ev.value);
-        _this.updatePipeline(wgSize); // TODO: queue.copy
+        _this.updatePipeline(); // TODO: queue.copy
       });
 
       input = this.pane.addInput(this.config, 'maxDepth', {
@@ -9668,7 +9670,7 @@ var Renderer = /*#__PURE__*/function () {
       });
       input.on('change', function (ev) {
         _this.raytracerConfig.max_depth(ev.value);
-        _this.updatePipeline(wgSize); // TODO: queue.copy
+        _this.updatePipeline(); // TODO: queue.copy
       });
 
       this.config.scene = 11;
@@ -9702,7 +9704,9 @@ var Renderer = /*#__PURE__*/function () {
               wgSize = 256;
               width = this.renderDims.width;
               height = this.renderDims.height;
+              this.wgSize = wgSize;
               this.numGroups = width * height / wgSize;
+              // console.log(`Dispatching ${this.numGroups} workgroups of size ${wgSize}`);
 
               // Output buffer
               bufferNumElements = width * height;
@@ -9717,23 +9721,23 @@ var Renderer = /*#__PURE__*/function () {
               // }
               // this.outputBuffer.unmap();
 
-              this.initTweakPane(wgSize);
+              this.initTweakPane();
               this.updateScene();
-              this.updatePipeline(wgSize);
-              _context2.next = 27;
+              this.updatePipeline();
+              _context2.next = 28;
               break;
-            case 23:
-              _context2.prev = 23;
+            case 24:
+              _context2.prev = 24;
               _context2.t0 = _context2["catch"](0);
               console.error(_context2.t0);
               return _context2.abrupt("return", false);
-            case 27:
-              return _context2.abrupt("return", true);
             case 28:
+              return _context2.abrupt("return", true);
+            case 29:
             case "end":
               return _context2.stop();
           }
-        }, _callee2, this, [[0, 23]]);
+        }, _callee2, this, [[0, 24]]);
       }));
       function initializeAPI() {
         return _initializeAPI.apply(this, arguments);
