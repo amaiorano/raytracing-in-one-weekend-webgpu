@@ -547,10 +547,12 @@ export default class Renderer {
             {
                 label: 'Resolution', options: resolutionsNames,
             });
-        input.on('change', () => {
-            updateResolution();
-            this.updateScene();
-            this.updatePipeline(); // TODO: queue.copy
+        input.on('change', ev => {
+            if (ev.last) {
+                updateResolution();
+                this.updateScene();
+                this.updatePipeline(); // TODO: queue.copy
+            }
         });
 
         // Scene
@@ -567,22 +569,28 @@ export default class Renderer {
                 }
             });
         input.on('change', ev => {
-            this.updateScene();
-            this.updatePipeline(); // TODO: queue.copy
+            if (ev.last) {
+                this.updateScene();
+                this.updatePipeline(); // TODO: queue.copy
+            }
         });
 
         input = this.pane.addInput(this.config, 'samplesPerPixel',
             { label: 'Samples Per Pixel', min: 1, max: 50, step: 1 });
         input.on('change', ev => {
-            this.raytracerConfig.samples_per_pixel(ev.value)
-            this.updatePipeline(); // TODO: queue.copy
+            if (ev.last) {
+                this.raytracerConfig.samples_per_pixel(ev.value)
+                this.updatePipeline(); // TODO: queue.copy
+            }
         });
 
         input = this.pane.addInput(this.config, 'maxDepth',
             { label: 'Max Ray Depth', min: 2, max: 20, step: 1 });
         input.on('change', ev => {
-            this.raytracerConfig.max_depth(ev.value)
-            this.updatePipeline(); // TODO: queue.copy
+            if (ev.last) {
+                this.raytracerConfig.max_depth(ev.value)
+                this.updatePipeline(); // TODO: queue.copy
+            }
         });
 
         this.config.scene = 11;
@@ -651,6 +659,10 @@ export default class Renderer {
 
     // Called once per frame
     render(dt: number) {
+        if (dt > 1) {
+            console.log(`Long frame detected: ${dt} seconds`);
+        }
+
         let commandBuffers = Array<GPUCommandBuffer>();
 
         if (this.pipeline === undefined) {
@@ -658,6 +670,7 @@ export default class Renderer {
         }
 
         const encoder = this.device.createCommandEncoder();
+
 
         if (this.dirty) {
             const pass = encoder.beginComputePass();
@@ -685,8 +698,6 @@ export default class Renderer {
         encoder.copyBufferToTexture(imageCopyBuffer, imageCopyTexture, extent);
 
         commandBuffers.push(encoder.finish());
-
-
         this.queue.submit(commandBuffers);
     };
 
