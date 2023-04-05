@@ -245,9 +245,10 @@ export default class Renderer {
     context: GPUCanvasContext;
 
     // Compute vars
+    wgSize: number; // Size of each workgroup
+    numGroups: number; // Number of workgroups to dispatch
     pipeline: GPUComputePipeline;
     bindGroup: GPUBindGroup;
-    numGroups: number;
     outputBuffer: GPUBuffer;
     materialsBuffer: GPUBuffer;
     hittableListBuffer: GPUBuffer;
@@ -460,7 +461,7 @@ export default class Renderer {
         }
     }
 
-    updatePipeline(wgSize: number) {
+    updatePipeline() {
         this.materialsBuffer = this.device.createBuffer({
             size: this.materials.buffer.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -493,7 +494,7 @@ export default class Renderer {
         Copy(this.raytracerConfig.buffer, this.raytracerConfigBuffer.getMappedRange());
         this.raytracerConfigBuffer.unmap();
 
-        const code = this.computeShader(wgSize, this.materials.count, this.hittableList.count);
+        const code = this.computeShader(this.wgSize, this.materials.count, this.hittableList.count);
         // console.log(code);
         this.pipeline = this.device.createComputePipeline({
             layout: 'auto',
@@ -517,7 +518,7 @@ export default class Renderer {
         this.dirty = true;
     }
 
-    initTweakPane(wgSize: number) {
+    initTweakPane() {
         this.raytracerConfig = new RaytracerConfig();
         this.pane = new Pane;
 
@@ -549,7 +550,7 @@ export default class Renderer {
         input.on('change', () => {
             updateResolution();
             this.updateScene();
-            this.updatePipeline(wgSize); // TODO: queue.copy
+            this.updatePipeline(); // TODO: queue.copy
         });
 
         // Scene
@@ -567,21 +568,21 @@ export default class Renderer {
             });
         input.on('change', ev => {
             this.updateScene();
-            this.updatePipeline(wgSize); // TODO: queue.copy
+            this.updatePipeline(); // TODO: queue.copy
         });
 
         input = this.pane.addInput(this.config, 'samplesPerPixel',
             { label: 'Samples Per Pixel', min: 1, max: 50, step: 1 });
         input.on('change', ev => {
             this.raytracerConfig.samples_per_pixel(ev.value)
-            this.updatePipeline(wgSize); // TODO: queue.copy
+            this.updatePipeline(); // TODO: queue.copy
         });
 
         input = this.pane.addInput(this.config, 'maxDepth',
             { label: 'Max Ray Depth', min: 2, max: 20, step: 1 });
         input.on('change', ev => {
             this.raytracerConfig.max_depth(ev.value)
-            this.updatePipeline(wgSize); // TODO: queue.copy
+            this.updatePipeline(); // TODO: queue.copy
         });
 
         this.config.scene = 11;
@@ -602,7 +603,10 @@ export default class Renderer {
             const wgSize = 256;
             const width = this.renderDims.width;
             const height = this.renderDims.height;
+
+            this.wgSize = wgSize;
             this.numGroups = (width * height) / wgSize;
+            // console.log(`Dispatching ${this.numGroups} workgroups of size ${wgSize}`);
 
             // Output buffer
             {
@@ -619,9 +623,9 @@ export default class Renderer {
                 // this.outputBuffer.unmap();
             }
 
-            this.initTweakPane(wgSize);
+            this.initTweakPane();
             this.updateScene();
-            this.updatePipeline(wgSize);
+            this.updatePipeline();
 
         } catch (e) {
             console.error(e);
