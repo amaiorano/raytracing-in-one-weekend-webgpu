@@ -9347,7 +9347,6 @@ var Renderer = /*#__PURE__*/function () {
 
   // Compute vars
 
-  // const aspect_ratio = 16 / 9;
   // Config vars
 
   function Renderer(canvas) {
@@ -9358,14 +9357,6 @@ var Renderer = /*#__PURE__*/function () {
       hittable_list: 2,
       camera_create_params: 3,
       raytracer_config: 4
-    });
-    _defineProperty(this, "resolutions", {
-      '256x144': [256, 144],
-      '320x180': [320, 180],
-      '448x252': [448, 252],
-      '512x288': [512, 288],
-      '960x540': [960, 540],
-      '1280x720': [1280, 720]
     });
     _defineProperty(this, "config", {
       resolutionIndex: 0,
@@ -9615,10 +9606,10 @@ var Renderer = /*#__PURE__*/function () {
       var resolutions = [];
       var resolutionsNames = {};
       var aspectRatio = this.canvas.width / this.canvas.height;
-      for (var i = 1; i < 20; ++i) {
-        var w = 64 * i;
+      for (var i = 1; i < 18; ++i) {
+        var w = 64 * (i + 2);
         var h = w / aspectRatio;
-        resolutionsNames["".concat(w, "x").concat(h)] = i;
+        resolutionsNames["".concat(w, "x").concat(h)] = i - 1;
         resolutions.push([w, h]);
       }
       var updateResolution = function updateResolution() {
@@ -9626,6 +9617,10 @@ var Renderer = /*#__PURE__*/function () {
         _this.renderDims.width = resolutions[index][0];
         _this.renderDims.height = resolutions[index][1];
       };
+
+      // Set default resolution index
+      this.config.resolutionIndex = 7;
+      updateResolution();
       var input = this.pane.addInput(this.config, 'resolutionIndex', {
         label: 'Resolution',
         options: resolutionsNames
@@ -9635,10 +9630,6 @@ var Renderer = /*#__PURE__*/function () {
         _this.updateScene();
         _this.updatePipeline(wgSize); // TODO: queue.copy
       });
-
-      // Set default resolution index
-      this.config.resolutionIndex = 5;
-      updateResolution();
 
       // Scene
       input = this.pane.addInput(this.config, 'scene', {
