@@ -208,8 +208,8 @@ class RaytracerConfig {
         this.buffer = new ArrayBuffer(112);
         this.writer = new BufferWriter(this.buffer);
         // Set some useful defaults
-        this.samples_per_pixel(100);
-        this.max_depth(50);
+        this.samples_per_pixel(25);
+        this.max_depth(10);
     }
 
     samples_per_pixel(v: number): RaytracerConfig {
@@ -258,7 +258,7 @@ export default class Renderer {
     // Config vars
     config = {
         scene: 1,
-        samplesPerPixel: 50,
+        samplesPerPixel: 25,
         maxDepth: 10,
     }
 
@@ -435,8 +435,6 @@ export default class Renderer {
 
             const lookfrom = vec3.fromValues(13, 2, 3);
             const lookat = vec3.fromValues(0, 0, 0);
-            let delta = vec3.create();
-            vec3.sub(delta, lookat, lookfrom);
             const focus_dist = 10.0;
             this.cameraCreateParams
                 .lookfrom(lookfrom)
@@ -528,7 +526,7 @@ export default class Renderer {
         });
 
         input = this.pane.addInput(this.config, 'samplesPerPixel',
-            { label: 'Samples Per Pixel', min: 1, max: 100, step: 1 });
+            { label: 'Samples Per Pixel', min: 1, max: 50, step: 1 });
         input.on('change', ev => {
             this.raytracerConfig.samples_per_pixel(ev.value)
             this.updatePipeline(wgSize); // TODO: queue.copy
