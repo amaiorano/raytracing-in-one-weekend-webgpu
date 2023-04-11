@@ -1075,21 +1075,27 @@ fn camera_get_ray(cam: ptr<function, camera>, s: f32, t: f32) -> ray {
 ///////////////////////////////////////////////////////////////////////////////
 // Random
 
-// Implementation copied from https://webgpu.github.io/webgpu-samples/samples/particles#./particle.wgsl
-var<private> rand_seed : vec2<f32>;
+// Implementation copied from https://webgpu.github.io/webgpu-samples/samples/cornell#./common.wgsl
 
-fn init_rand(invocation_id : u32, seed : vec4f) {
-  rand_seed = seed.xz;
-  rand_seed = fract(rand_seed * cos(35.456+f32(invocation_id) * seed.yw));
-  rand_seed = fract(rand_seed * cos(41.235+f32(invocation_id) * seed.xw));
+// A psuedo random number. Initialized with init_rand(), updated with rand().
+var<private> rnd : vec3u;
+
+// Initializes the random number generator.
+fn init_rand(invocation_id : vec3u, seed : vec3u) {
+  const A = vec3(1741651 * 1009,
+                 140893  * 1609 * 13,
+                 6521    * 983  * 7 * 2);
+  rnd = (invocation_id * A) ^ seed;
 }
 
-// Returns random value in [0.0, 1.0)
+// Returns a random number between 0 and 1.
 fn random_f32() -> f32 {
-    // return 0.0f;
-    rand_seed.x = fract(cos(dot(rand_seed, vec2<f32>(23.14077926, 232.61690225))) * 136.8168);
-    rand_seed.y = fract(cos(dot(rand_seed, vec2<f32>(54.47856553, 345.84153136))) * 534.7645);
-    return rand_seed.y;
+  const C = vec3(60493  * 9377,
+                 11279  * 2539 * 23,
+                 7919   * 631  * 5 * 3);
+
+  rnd = (rnd * C) ^ (rnd.yzx >> vec3(4u));
+  return f32(rnd.x ^ rnd.y) / f32(0xffffffff);
 }
 
 fn random_range_f32(min: f32, max: f32) -> f32 {
@@ -1202,7 +1208,7 @@ fn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {
 fn main(
     @builtin(global_invocation_id) global_invocation_id : vec3<u32>,
     ) {
-        init_rand(global_invocation_id.x, config.rand_seed);
+        init_rand(global_invocation_id, vec3u(config.rand_seed.xyz * 0xffffffff));
 
         // Camera
         var cam = camera_create(cp);
