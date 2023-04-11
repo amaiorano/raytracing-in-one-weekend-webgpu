@@ -9048,6 +9048,670 @@ var forEach = function () {
     return a;
   };
 }();
+;// CONCATENATED MODULE: ./node_modules/gl-matrix/esm/vec4.js
+
+/**
+ * 4 Dimensional Vector
+ * @module vec4
+ */
+
+/**
+ * Creates a new, empty vec4
+ *
+ * @returns {vec4} a new 4D vector
+ */
+
+function vec4_create() {
+  var out = new ARRAY_TYPE(4);
+
+  if (ARRAY_TYPE != Float32Array) {
+    out[0] = 0;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+  }
+
+  return out;
+}
+/**
+ * Creates a new vec4 initialized with values from an existing vector
+ *
+ * @param {ReadonlyVec4} a vector to clone
+ * @returns {vec4} a new 4D vector
+ */
+
+function vec4_clone(a) {
+  var out = new glMatrix.ARRAY_TYPE(4);
+  out[0] = a[0];
+  out[1] = a[1];
+  out[2] = a[2];
+  out[3] = a[3];
+  return out;
+}
+/**
+ * Creates a new vec4 initialized with the given values
+ *
+ * @param {Number} x X component
+ * @param {Number} y Y component
+ * @param {Number} z Z component
+ * @param {Number} w W component
+ * @returns {vec4} a new 4D vector
+ */
+
+function vec4_fromValues(x, y, z, w) {
+  var out = new ARRAY_TYPE(4);
+  out[0] = x;
+  out[1] = y;
+  out[2] = z;
+  out[3] = w;
+  return out;
+}
+/**
+ * Copy the values from one vec4 to another
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the source vector
+ * @returns {vec4} out
+ */
+
+function vec4_copy(out, a) {
+  out[0] = a[0];
+  out[1] = a[1];
+  out[2] = a[2];
+  out[3] = a[3];
+  return out;
+}
+/**
+ * Set the components of a vec4 to the given values
+ *
+ * @param {vec4} out the receiving vector
+ * @param {Number} x X component
+ * @param {Number} y Y component
+ * @param {Number} z Z component
+ * @param {Number} w W component
+ * @returns {vec4} out
+ */
+
+function vec4_set(out, x, y, z, w) {
+  out[0] = x;
+  out[1] = y;
+  out[2] = z;
+  out[3] = w;
+  return out;
+}
+/**
+ * Adds two vec4's
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @returns {vec4} out
+ */
+
+function vec4_add(out, a, b) {
+  out[0] = a[0] + b[0];
+  out[1] = a[1] + b[1];
+  out[2] = a[2] + b[2];
+  out[3] = a[3] + b[3];
+  return out;
+}
+/**
+ * Subtracts vector b from vector a
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @returns {vec4} out
+ */
+
+function vec4_subtract(out, a, b) {
+  out[0] = a[0] - b[0];
+  out[1] = a[1] - b[1];
+  out[2] = a[2] - b[2];
+  out[3] = a[3] - b[3];
+  return out;
+}
+/**
+ * Multiplies two vec4's
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @returns {vec4} out
+ */
+
+function vec4_multiply(out, a, b) {
+  out[0] = a[0] * b[0];
+  out[1] = a[1] * b[1];
+  out[2] = a[2] * b[2];
+  out[3] = a[3] * b[3];
+  return out;
+}
+/**
+ * Divides two vec4's
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @returns {vec4} out
+ */
+
+function vec4_divide(out, a, b) {
+  out[0] = a[0] / b[0];
+  out[1] = a[1] / b[1];
+  out[2] = a[2] / b[2];
+  out[3] = a[3] / b[3];
+  return out;
+}
+/**
+ * Math.ceil the components of a vec4
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a vector to ceil
+ * @returns {vec4} out
+ */
+
+function vec4_ceil(out, a) {
+  out[0] = Math.ceil(a[0]);
+  out[1] = Math.ceil(a[1]);
+  out[2] = Math.ceil(a[2]);
+  out[3] = Math.ceil(a[3]);
+  return out;
+}
+/**
+ * Math.floor the components of a vec4
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a vector to floor
+ * @returns {vec4} out
+ */
+
+function vec4_floor(out, a) {
+  out[0] = Math.floor(a[0]);
+  out[1] = Math.floor(a[1]);
+  out[2] = Math.floor(a[2]);
+  out[3] = Math.floor(a[3]);
+  return out;
+}
+/**
+ * Returns the minimum of two vec4's
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @returns {vec4} out
+ */
+
+function vec4_min(out, a, b) {
+  out[0] = Math.min(a[0], b[0]);
+  out[1] = Math.min(a[1], b[1]);
+  out[2] = Math.min(a[2], b[2]);
+  out[3] = Math.min(a[3], b[3]);
+  return out;
+}
+/**
+ * Returns the maximum of two vec4's
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @returns {vec4} out
+ */
+
+function vec4_max(out, a, b) {
+  out[0] = Math.max(a[0], b[0]);
+  out[1] = Math.max(a[1], b[1]);
+  out[2] = Math.max(a[2], b[2]);
+  out[3] = Math.max(a[3], b[3]);
+  return out;
+}
+/**
+ * Math.round the components of a vec4
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a vector to round
+ * @returns {vec4} out
+ */
+
+function vec4_round(out, a) {
+  out[0] = Math.round(a[0]);
+  out[1] = Math.round(a[1]);
+  out[2] = Math.round(a[2]);
+  out[3] = Math.round(a[3]);
+  return out;
+}
+/**
+ * Scales a vec4 by a scalar number
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the vector to scale
+ * @param {Number} b amount to scale the vector by
+ * @returns {vec4} out
+ */
+
+function vec4_scale(out, a, b) {
+  out[0] = a[0] * b;
+  out[1] = a[1] * b;
+  out[2] = a[2] * b;
+  out[3] = a[3] * b;
+  return out;
+}
+/**
+ * Adds two vec4's after scaling the second operand by a scalar value
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @param {Number} scale the amount to scale b by before adding
+ * @returns {vec4} out
+ */
+
+function vec4_scaleAndAdd(out, a, b, scale) {
+  out[0] = a[0] + b[0] * scale;
+  out[1] = a[1] + b[1] * scale;
+  out[2] = a[2] + b[2] * scale;
+  out[3] = a[3] + b[3] * scale;
+  return out;
+}
+/**
+ * Calculates the euclidian distance between two vec4's
+ *
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @returns {Number} distance between a and b
+ */
+
+function vec4_distance(a, b) {
+  var x = b[0] - a[0];
+  var y = b[1] - a[1];
+  var z = b[2] - a[2];
+  var w = b[3] - a[3];
+  return Math.hypot(x, y, z, w);
+}
+/**
+ * Calculates the squared euclidian distance between two vec4's
+ *
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @returns {Number} squared distance between a and b
+ */
+
+function vec4_squaredDistance(a, b) {
+  var x = b[0] - a[0];
+  var y = b[1] - a[1];
+  var z = b[2] - a[2];
+  var w = b[3] - a[3];
+  return x * x + y * y + z * z + w * w;
+}
+/**
+ * Calculates the length of a vec4
+ *
+ * @param {ReadonlyVec4} a vector to calculate length of
+ * @returns {Number} length of a
+ */
+
+function vec4_length(a) {
+  var x = a[0];
+  var y = a[1];
+  var z = a[2];
+  var w = a[3];
+  return Math.hypot(x, y, z, w);
+}
+/**
+ * Calculates the squared length of a vec4
+ *
+ * @param {ReadonlyVec4} a vector to calculate squared length of
+ * @returns {Number} squared length of a
+ */
+
+function vec4_squaredLength(a) {
+  var x = a[0];
+  var y = a[1];
+  var z = a[2];
+  var w = a[3];
+  return x * x + y * y + z * z + w * w;
+}
+/**
+ * Negates the components of a vec4
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a vector to negate
+ * @returns {vec4} out
+ */
+
+function vec4_negate(out, a) {
+  out[0] = -a[0];
+  out[1] = -a[1];
+  out[2] = -a[2];
+  out[3] = -a[3];
+  return out;
+}
+/**
+ * Returns the inverse of the components of a vec4
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a vector to invert
+ * @returns {vec4} out
+ */
+
+function vec4_inverse(out, a) {
+  out[0] = 1.0 / a[0];
+  out[1] = 1.0 / a[1];
+  out[2] = 1.0 / a[2];
+  out[3] = 1.0 / a[3];
+  return out;
+}
+/**
+ * Normalize a vec4
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a vector to normalize
+ * @returns {vec4} out
+ */
+
+function vec4_normalize(out, a) {
+  var x = a[0];
+  var y = a[1];
+  var z = a[2];
+  var w = a[3];
+  var len = x * x + y * y + z * z + w * w;
+
+  if (len > 0) {
+    len = 1 / Math.sqrt(len);
+  }
+
+  out[0] = x * len;
+  out[1] = y * len;
+  out[2] = z * len;
+  out[3] = w * len;
+  return out;
+}
+/**
+ * Calculates the dot product of two vec4's
+ *
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @returns {Number} dot product of a and b
+ */
+
+function vec4_dot(a, b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+}
+/**
+ * Returns the cross-product of three vectors in a 4-dimensional space
+ *
+ * @param {ReadonlyVec4} result the receiving vector
+ * @param {ReadonlyVec4} U the first vector
+ * @param {ReadonlyVec4} V the second vector
+ * @param {ReadonlyVec4} W the third vector
+ * @returns {vec4} result
+ */
+
+function vec4_cross(out, u, v, w) {
+  var A = v[0] * w[1] - v[1] * w[0],
+      B = v[0] * w[2] - v[2] * w[0],
+      C = v[0] * w[3] - v[3] * w[0],
+      D = v[1] * w[2] - v[2] * w[1],
+      E = v[1] * w[3] - v[3] * w[1],
+      F = v[2] * w[3] - v[3] * w[2];
+  var G = u[0];
+  var H = u[1];
+  var I = u[2];
+  var J = u[3];
+  out[0] = H * F - I * E + J * D;
+  out[1] = -(G * F) + I * C - J * B;
+  out[2] = G * E - H * C + J * A;
+  out[3] = -(G * D) + H * B - I * A;
+  return out;
+}
+/**
+ * Performs a linear interpolation between two vec4's
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the first operand
+ * @param {ReadonlyVec4} b the second operand
+ * @param {Number} t interpolation amount, in the range [0-1], between the two inputs
+ * @returns {vec4} out
+ */
+
+function vec4_lerp(out, a, b, t) {
+  var ax = a[0];
+  var ay = a[1];
+  var az = a[2];
+  var aw = a[3];
+  out[0] = ax + t * (b[0] - ax);
+  out[1] = ay + t * (b[1] - ay);
+  out[2] = az + t * (b[2] - az);
+  out[3] = aw + t * (b[3] - aw);
+  return out;
+}
+/**
+ * Generates a random vector with the given scale
+ *
+ * @param {vec4} out the receiving vector
+ * @param {Number} [scale] Length of the resulting vector. If ommitted, a unit vector will be returned
+ * @returns {vec4} out
+ */
+
+function vec4_random(out, scale) {
+  scale = scale || 1.0; // Marsaglia, George. Choosing a Point from the Surface of a
+  // Sphere. Ann. Math. Statist. 43 (1972), no. 2, 645--646.
+  // http://projecteuclid.org/euclid.aoms/1177692644;
+
+  var v1, v2, v3, v4;
+  var s1, s2;
+
+  do {
+    v1 = glMatrix.RANDOM() * 2 - 1;
+    v2 = glMatrix.RANDOM() * 2 - 1;
+    s1 = v1 * v1 + v2 * v2;
+  } while (s1 >= 1);
+
+  do {
+    v3 = glMatrix.RANDOM() * 2 - 1;
+    v4 = glMatrix.RANDOM() * 2 - 1;
+    s2 = v3 * v3 + v4 * v4;
+  } while (s2 >= 1);
+
+  var d = Math.sqrt((1 - s1) / s2);
+  out[0] = scale * v1;
+  out[1] = scale * v2;
+  out[2] = scale * v3 * d;
+  out[3] = scale * v4 * d;
+  return out;
+}
+/**
+ * Transforms the vec4 with a mat4.
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the vector to transform
+ * @param {ReadonlyMat4} m matrix to transform with
+ * @returns {vec4} out
+ */
+
+function vec4_transformMat4(out, a, m) {
+  var x = a[0],
+      y = a[1],
+      z = a[2],
+      w = a[3];
+  out[0] = m[0] * x + m[4] * y + m[8] * z + m[12] * w;
+  out[1] = m[1] * x + m[5] * y + m[9] * z + m[13] * w;
+  out[2] = m[2] * x + m[6] * y + m[10] * z + m[14] * w;
+  out[3] = m[3] * x + m[7] * y + m[11] * z + m[15] * w;
+  return out;
+}
+/**
+ * Transforms the vec4 with a quat
+ *
+ * @param {vec4} out the receiving vector
+ * @param {ReadonlyVec4} a the vector to transform
+ * @param {ReadonlyQuat} q quaternion to transform with
+ * @returns {vec4} out
+ */
+
+function vec4_transformQuat(out, a, q) {
+  var x = a[0],
+      y = a[1],
+      z = a[2];
+  var qx = q[0],
+      qy = q[1],
+      qz = q[2],
+      qw = q[3]; // calculate quat * vec
+
+  var ix = qw * x + qy * z - qz * y;
+  var iy = qw * y + qz * x - qx * z;
+  var iz = qw * z + qx * y - qy * x;
+  var iw = -qx * x - qy * y - qz * z; // calculate result * inverse quat
+
+  out[0] = ix * qw + iw * -qx + iy * -qz - iz * -qy;
+  out[1] = iy * qw + iw * -qy + iz * -qx - ix * -qz;
+  out[2] = iz * qw + iw * -qz + ix * -qy - iy * -qx;
+  out[3] = a[3];
+  return out;
+}
+/**
+ * Set the components of a vec4 to zero
+ *
+ * @param {vec4} out the receiving vector
+ * @returns {vec4} out
+ */
+
+function vec4_zero(out) {
+  out[0] = 0.0;
+  out[1] = 0.0;
+  out[2] = 0.0;
+  out[3] = 0.0;
+  return out;
+}
+/**
+ * Returns a string representation of a vector
+ *
+ * @param {ReadonlyVec4} a vector to represent as a string
+ * @returns {String} string representation of the vector
+ */
+
+function vec4_str(a) {
+  return "vec4(" + a[0] + ", " + a[1] + ", " + a[2] + ", " + a[3] + ")";
+}
+/**
+ * Returns whether or not the vectors have exactly the same elements in the same position (when compared with ===)
+ *
+ * @param {ReadonlyVec4} a The first vector.
+ * @param {ReadonlyVec4} b The second vector.
+ * @returns {Boolean} True if the vectors are equal, false otherwise.
+ */
+
+function vec4_exactEquals(a, b) {
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+}
+/**
+ * Returns whether or not the vectors have approximately the same elements in the same position.
+ *
+ * @param {ReadonlyVec4} a The first vector.
+ * @param {ReadonlyVec4} b The second vector.
+ * @returns {Boolean} True if the vectors are equal, false otherwise.
+ */
+
+function vec4_equals(a, b) {
+  var a0 = a[0],
+      a1 = a[1],
+      a2 = a[2],
+      a3 = a[3];
+  var b0 = b[0],
+      b1 = b[1],
+      b2 = b[2],
+      b3 = b[3];
+  return Math.abs(a0 - b0) <= glMatrix.EPSILON * Math.max(1.0, Math.abs(a0), Math.abs(b0)) && Math.abs(a1 - b1) <= glMatrix.EPSILON * Math.max(1.0, Math.abs(a1), Math.abs(b1)) && Math.abs(a2 - b2) <= glMatrix.EPSILON * Math.max(1.0, Math.abs(a2), Math.abs(b2)) && Math.abs(a3 - b3) <= glMatrix.EPSILON * Math.max(1.0, Math.abs(a3), Math.abs(b3));
+}
+/**
+ * Alias for {@link vec4.subtract}
+ * @function
+ */
+
+var vec4_sub = (/* unused pure expression or super */ null && (vec4_subtract));
+/**
+ * Alias for {@link vec4.multiply}
+ * @function
+ */
+
+var vec4_mul = (/* unused pure expression or super */ null && (vec4_multiply));
+/**
+ * Alias for {@link vec4.divide}
+ * @function
+ */
+
+var vec4_div = (/* unused pure expression or super */ null && (vec4_divide));
+/**
+ * Alias for {@link vec4.distance}
+ * @function
+ */
+
+var vec4_dist = (/* unused pure expression or super */ null && (vec4_distance));
+/**
+ * Alias for {@link vec4.squaredDistance}
+ * @function
+ */
+
+var vec4_sqrDist = (/* unused pure expression or super */ null && (vec4_squaredDistance));
+/**
+ * Alias for {@link vec4.length}
+ * @function
+ */
+
+var vec4_len = (/* unused pure expression or super */ null && (vec4_length));
+/**
+ * Alias for {@link vec4.squaredLength}
+ * @function
+ */
+
+var vec4_sqrLen = (/* unused pure expression or super */ null && (vec4_squaredLength));
+/**
+ * Perform some operation over an array of vec4s.
+ *
+ * @param {Array} a the array of vectors to iterate over
+ * @param {Number} stride Number of elements between the start of each vec4. If 0 assumes tightly packed
+ * @param {Number} offset Number of elements to skip at the beginning of the array
+ * @param {Number} count Number of vec4s to iterate over. If 0 iterates over entire array
+ * @param {Function} fn Function to call for each vector in the array
+ * @param {Object} [arg] additional argument to pass to fn
+ * @returns {Array} a
+ * @function
+ */
+
+var vec4_forEach = function () {
+  var vec = vec4_create();
+  return function (a, stride, offset, count, fn, arg) {
+    var i, l;
+
+    if (!stride) {
+      stride = 4;
+    }
+
+    if (!offset) {
+      offset = 0;
+    }
+
+    if (count) {
+      l = Math.min(count * stride + offset, a.length);
+    } else {
+      l = a.length;
+    }
+
+    for (i = offset; i < l; i += stride) {
+      vec[0] = a[i];
+      vec[1] = a[i + 1];
+      vec[2] = a[i + 2];
+      vec[3] = a[i + 3];
+      fn(vec, vec, arg);
+      a[i] = vec[0];
+      a[i + 1] = vec[1];
+      a[i + 2] = vec[2];
+      a[i + 3] = vec[3];
+    }
+
+    return a;
+  };
+}();
 // EXTERNAL MODULE: ./node_modules/tweakpane/dist/tweakpane.js
 var tweakpane = __webpack_require__(498);
 ;// CONCATENATED MODULE: ./src/renderer.ts
@@ -9114,6 +9778,11 @@ var BufferWriter = /*#__PURE__*/function () {
     key: "setVec3f",
     value: function setVec3f(offset, v) {
       new Float32Array(this.buffer, offset).set([v[0], v[1], v[2]]);
+    }
+  }, {
+    key: "setVec4f",
+    value: function setVec4f(offset, v) {
+      new Float32Array(this.buffer, offset).set([v[0], v[1], v[2], v[3]]);
     }
   }]);
   return BufferWriter;
@@ -9305,10 +9974,14 @@ var CameraCreateParams = /*#__PURE__*/function () {
   return CameraCreateParams;
 }();
 var RaytracerConfig = /*#__PURE__*/function () {
-  // /*           align(4) size(8) */ struct raytracer_config {
-  // /* offset(0) align(4) size(4) */   samples_per_pixel : u32;
-  // /* offset(4) align(4) size(4) */   max_depth : u32;
-  // /*                            */ };
+  // /*            align(16) size(48) */ struct raytracer_config {
+  // /* offset( 0) align( 4) size( 4) */   samples_per_pixel : u32;
+  // /* offset( 4) align( 4) size( 4) */   max_depth : u32;
+  // /* offset( 8) align( 1) size( 8) */   // -- implicit field alignment padding --;
+  // /* offset(16) align(16) size(16) */   rand_seed : vec4<f32>;
+  // /* offset(32) align( 4) size( 4) */   weight : f32;
+  // /* offset(36) align( 1) size(12) */   // -- implicit struct size padding --;
+  // /*                               */ };
 
   function RaytracerConfig() {
     _classCallCheck(this, RaytracerConfig);
@@ -9328,6 +10001,18 @@ var RaytracerConfig = /*#__PURE__*/function () {
     key: "max_depth",
     value: function max_depth(v) {
       this.writer.setU32(4, v);
+      return this;
+    }
+  }, {
+    key: "rand_seed",
+    value: function rand_seed(v) {
+      this.writer.setVec4f(16, v);
+      return this;
+    }
+  }, {
+    key: "weight",
+    value: function weight(v) {
+      this.writer.setF32(32, v);
       return this;
     }
   }]);
@@ -9368,6 +10053,13 @@ var Renderer = /*#__PURE__*/function () {
       maxDepth: 10
     });
     _defineProperty(this, "dirty", true);
+    _defineProperty(this, "frameSamplesPerPixel", {
+      max: 1,
+      // Max per frame (constant)
+      left: 0,
+      // How many are left to process this frame
+      done: 0 // How many processed so far
+    });
     this.canvas = canvas;
     this.renderDims = new Dims(canvas.width, canvas.height);
   }
@@ -9549,12 +10241,9 @@ var Renderer = /*#__PURE__*/function () {
       Copy(this.cameraCreateParams.buffer, this.cameraCreateParamsBuffer.getMappedRange());
       this.cameraCreateParamsBuffer.unmap();
       this.raytracerConfigBuffer = this.device.createBuffer({
-        size: this.raytracerConfig.buffer.byteLength,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        mappedAtCreation: true
+        size: new RaytracerConfig().buffer.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
       });
-      Copy(this.raytracerConfig.buffer, this.raytracerConfigBuffer.getMappedRange());
-      this.raytracerConfigBuffer.unmap();
       var code = this.computeShader(this.wgSize, this.materials.count, this.hittableList.count);
       // console.log(code);
       this.pipeline = this.device.createComputePipeline({
@@ -9601,7 +10290,6 @@ var Renderer = /*#__PURE__*/function () {
     key: "initTweakPane",
     value: function initTweakPane() {
       var _this = this;
-      this.raytracerConfig = new RaytracerConfig();
       this.pane = new tweakpane.Pane();
 
       // Resolution
@@ -9627,10 +10315,12 @@ var Renderer = /*#__PURE__*/function () {
         label: 'Resolution',
         options: resolutionsNames
       });
-      input.on('change', function () {
-        updateResolution();
-        _this.updateScene();
-        _this.updatePipeline(); // TODO: queue.copy
+      input.on('change', function (ev) {
+        if (ev.last) {
+          updateResolution();
+          _this.updateScene();
+          _this.updatePipeline(); // TODO: queue.copy
+        }
       });
 
       // Scene
@@ -9647,8 +10337,10 @@ var Renderer = /*#__PURE__*/function () {
         }
       });
       input.on('change', function (ev) {
-        _this.updateScene();
-        _this.updatePipeline(); // TODO: queue.copy
+        if (ev.last) {
+          _this.updateScene();
+          _this.updatePipeline(); // TODO: queue.copy
+        }
       });
 
       input = this.pane.addInput(this.config, 'samplesPerPixel', {
@@ -9658,8 +10350,9 @@ var Renderer = /*#__PURE__*/function () {
         step: 1
       });
       input.on('change', function (ev) {
-        _this.raytracerConfig.samples_per_pixel(ev.value);
-        _this.updatePipeline(); // TODO: queue.copy
+        if (ev.last) {
+          _this.updatePipeline(); // TODO: queue.copy
+        }
       });
 
       input = this.pane.addInput(this.config, 'maxDepth', {
@@ -9669,8 +10362,9 @@ var Renderer = /*#__PURE__*/function () {
         step: 1
       });
       input.on('change', function (ev) {
-        _this.raytracerConfig.max_depth(ev.value);
-        _this.updatePipeline(); // TODO: queue.copy
+        if (ev.last) {
+          _this.updatePipeline(); // TODO: queue.copy
+        }
       });
 
       this.config.scene = 11;
@@ -9701,7 +10395,7 @@ var Renderer = /*#__PURE__*/function () {
             case 10:
               this.device = _context2.sent;
               this.queue = this.device.queue;
-              wgSize = 256;
+              wgSize = 64;
               width = this.renderDims.width;
               height = this.renderDims.height;
               this.wgSize = wgSize;
@@ -9712,7 +10406,7 @@ var Renderer = /*#__PURE__*/function () {
               bufferNumElements = width * height;
               this.outputBuffer = this.device.createBuffer({
                 size: bufferNumElements * Uint32Array.BYTES_PER_ELEMENT,
-                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST
                 // mappedAtCreation: true,
               });
               // const data = new Uint32Array(this.outputBuffer.getMappedRange());
@@ -9772,22 +10466,56 @@ var Renderer = /*#__PURE__*/function () {
         return _onResize.apply(this, arguments);
       }
       return onResize;
-    }() // Called once per frame
+    }()
   }, {
     key: "render",
-    value: function render(dt) {
-      var commandBuffers = Array();
+    value:
+    // Called once per frame
+    function render(dt) {
+      if (dt > 1) {
+        console.log("Long frame detected: ".concat(dt, " seconds"));
+      }
       if (this.pipeline === undefined) {
         return;
       }
+      var commandBuffers = Array();
       var encoder = this.device.createCommandEncoder();
       if (this.dirty) {
+        this.frameSamplesPerPixel.left = this.config.samplesPerPixel;
+        this.frameSamplesPerPixel.done = 0;
+        // Clear output buffer to start accumulating into it
+        encoder.clearBuffer(this.outputBuffer);
+        this.dirty = false;
+      }
+      if (this.frameSamplesPerPixel.left > 0) {
+        var currSamplesPerPixel = Math.min(this.frameSamplesPerPixel.left, this.frameSamplesPerPixel.max);
+        // Compute the amount this frame will contribute to the final pixel as a ratio of how many samples have
+        // been processed so far.
+        var weight = currSamplesPerPixel / (this.frameSamplesPerPixel.done + currSamplesPerPixel);
+        // console.log(`currSamplesPerPixel: ${currSamplesPerPixel}, weight: ${weight}`)
+
+        var config = new RaytracerConfig();
+        config.max_depth(this.config.maxDepth);
+        config.samples_per_pixel(currSamplesPerPixel);
+        config.rand_seed(vec4_fromValues(Math.random(), Math.random(), Math.random(), Math.random()));
+        config.weight(weight);
+
+        // TODO: cache set of staging buffers
+        var stagingBuffer = this.device.createBuffer({
+          size: config.buffer.byteLength,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_SRC,
+          mappedAtCreation: true
+        });
+        Copy(config.buffer, stagingBuffer.getMappedRange());
+        encoder.copyBufferToBuffer(stagingBuffer, 0, this.raytracerConfigBuffer, 0, config.buffer.byteLength);
+        stagingBuffer.unmap();
         var pass = encoder.beginComputePass();
         pass.setPipeline(this.pipeline);
         pass.setBindGroup(0, this.bindGroup);
         pass.dispatchWorkgroups(this.numGroups);
         pass.end();
-        this.dirty = false;
+        this.frameSamplesPerPixel.left -= currSamplesPerPixel;
+        this.frameSamplesPerPixel.done += currSamplesPerPixel;
       }
 
       // Copy output from compute shader to canvas
@@ -9813,7 +10541,7 @@ var Renderer = /*#__PURE__*/function () {
     value: function computeShader(wgSize, numMaterials, numSpheres) {
       var width = this.renderDims.width;
       var height = this.renderDims.height;
-      var wgsl = "\n///////////////////////////////////////////////////////////////////////////////\n// Common\nalias material_index = u32;\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Ray\n\nstruct ray {\n    orig : vec3f,\n    dir : vec3f,\n}\n\nfn ray_at(r: ray, t: f32) -> vec3f {\n    return r.orig + t * r.dir;\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Color\n\nalias color = vec3f;\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Utils\nfn length_squared(v: vec3f) -> f32 {\n    let l = length(v);\n    return l * l;\n}\n\nfn near_zero(v: vec3f) -> bool {\n    const s = 1e-8;\n    return length(v) < s;\n}\n\nfn random_in_unit_sphere() -> vec3f {\n    for (var i = 0; i < 1000; i += 1) {\n        let p = random_range_vec3f(-1, 1);\n        if (length_squared(p) >= 1) {\n            continue;\n        }\n        return p;\n    }\n    return vec3f(0,0,0.3);\n}\n\nfn random_unit_vector() -> vec3f {\n    return normalize(random_in_unit_sphere());\n}\n\nfn random_in_hemisphere(normal: vec3f) -> vec3f {\n    let in_unit_sphere = random_in_unit_sphere();\n    if (dot(in_unit_sphere, normal) > 0.0) { // In the same hemisphere as the normal\n        return in_unit_sphere;\n    }\n    else {\n        return -in_unit_sphere;\n    }\n}\n\nfn random_in_unit_disk() -> vec3f {\n    for (var i = 0; i < 1000; i += 1) {\n        let p = vec3f(random_range_f32(-1,1), random_range_f32(-1,1), 0);\n        if (length_squared(p) >= 1) {\n            continue;\n        }\n        return p;\n    }\n    return vec3f(0.3,0,0);\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Hittable\nstruct hit_record {\n    p: vec3f,\n    normal: vec3f,\n    t: f32,\n    front_face: bool,\n    mat: material_index,\n}\n\nfn hit_record_set_face_normal(rec: ptr<function, hit_record>, r: ray, outward_normal: vec3f) {\n    (*rec).front_face = dot(r.dir, outward_normal) < 0.0;\n    if ((*rec).front_face) {\n        (*rec).normal = outward_normal;\n    } else {\n        (*rec).normal = -outward_normal;\n    }\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Material\n\nalias material_type = u32;\nconst MATERIAL_LAMBERTIAN:  material_type = 0;\nconst MATERIAL_METAL:       material_type = 1;\nconst MATERIAL_DIELECTRIC:  material_type = 2;\n\nstruct lambertian_material {\n    albedo: color,\n}\n\nstruct metal_material {\n    albedo: color,\n    fuzz: f32,\n}\n\nstruct dielectric_material {\n    ir: f32 // index of refraction\n}\n\nstruct material {\n    // NOTE: ideally we'd use a discriminated union\n    ty: material_type,\n    lambertian: lambertian_material,\n    metal: metal_material,\n    dielectric: dielectric_material\n}\n\nconst NUM_MATERIALS = ".concat(numMaterials, ";\n\n@group(0) @binding(").concat(this.bindings.materials, ")\nvar<uniform> materials: array<material, NUM_MATERIALS>;\n\n\n// For the input ray and hit on the input material, returns true if the ray bounces, and if so,\n// stores the color contribution (attenuation) from this material and the new bounce (scatter) ray.\nfn material_scatter(mat: material_index, r_in: ray, rec: hit_record, attenuation: ptr<function, color>, scattered: ptr<function, ray>) -> bool {\n    let m = materials[mat];\n    if (m.ty == MATERIAL_LAMBERTIAN) {\n        var scatter_direction = rec.normal + random_unit_vector();\n\n        // Catch degenerate scatter direction\n        if (near_zero(scatter_direction)) {\n            scatter_direction = rec.normal;\n        }\n\n        *scattered = ray(rec.p, scatter_direction);\n        *attenuation = m.lambertian.albedo;\n        return true;\n\n    } else if (m.ty == MATERIAL_METAL) {\n        let reflected = reflect(normalize(r_in.dir), rec.normal);\n        *scattered = ray(rec.p, reflected + m.metal.fuzz * random_in_unit_sphere());\n        *attenuation = m.metal.albedo;\n        // Only bounce rays that reflect in the same direction as the incident normal\n        return dot((*scattered).dir, rec.normal) > 0;\n    \n    } else if (m.ty == MATERIAL_DIELECTRIC) {\n        *attenuation = color(1, 1, 1);\n        let refraction_ratio = select(m.dielectric.ir, 1.0 / m.dielectric.ir, rec.front_face);\n\n        let unit_direction = normalize(r_in.dir);\n        let cos_theta = min(dot(-unit_direction, rec.normal), 1.0);\n        let sin_theta = sqrt(1.0 - cos_theta * cos_theta);\n\n        let cannot_refract = (refraction_ratio * sin_theta) > 1.0;\n        var direction: vec3f;\n\n        if (cannot_refract || reflectance(cos_theta, refraction_ratio) > random_f32()) {\n            direction = reflect(unit_direction, rec.normal);\n        } else {\n            direction = refract(unit_direction, rec.normal, refraction_ratio);\n        }\n\n        *scattered = ray(rec.p, direction);\n        return true;\n    }\n\n    return false;\n}\n\nfn reflectance(cosine: f32, ref_idx: f32) -> f32 {\n    // Use Schlick's approximation for reflectance.\n    var r0 = (1-ref_idx) / (1+ref_idx);\n    r0 = r0*r0;\n    return r0 + (1-r0)*pow((1 - cosine),5);\n}\n\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Sphere\nstruct sphere {\n    center: vec3f,\n    radius: f32,\n    mat: material_index,\n}\n\nfn sphere_hit(sphere_index: u32, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {\n    let s = &world.spheres[sphere_index];\n    let oc = r.orig - (*s).center;\n    let a = length_squared(r.dir);\n    let half_b = dot(oc, r.dir);\n    let c = length_squared(oc) - (*s).radius*(*s).radius;\n    let discriminant = half_b*half_b - a*c;\n\n    if (discriminant < 0) {\n        return false;\n    }\n\n    let sqrtd = sqrt(discriminant);\n\n    // Find the nearest root that lies in the acceptable range.\n    var root = (-half_b - sqrtd) / a;\n    if (root < t_min || t_max < root) {\n        root = (-half_b + sqrtd) / a;\n        if (root < t_min || t_max < root) {\n            return false;\n        }\n    }\n\n    (*rec).t = root;\n    (*rec).p = ray_at(r, (*rec).t);\n    let outward_normal = ((*rec).p - (*s).center) / (*s).radius;\n    hit_record_set_face_normal(rec, r, outward_normal);\n    (*rec).mat = (*s).mat;\n\n    return true;\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Hittable List\nconst NUM_SPHERES = ").concat(numSpheres, ";\nstruct hittable_list {\n    spheres: array<sphere, NUM_SPHERES>,\n}\n\n@group(0) @binding(").concat(this.bindings.hittable_list, ")\nvar<uniform> world: hittable_list;\n\nfn hittable_list_hit(r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {\n    var temp_rec: hit_record;\n    var hit_anything = false;\n    var closest_so_far = t_max;\n\n    for (var i = 0u; i < NUM_SPHERES; i += 1u) {\n        let s = &world.spheres[i];\n        if (sphere_hit(i, r, t_min, closest_so_far, &temp_rec)) {\n            hit_anything = true;\n            closest_so_far = temp_rec.t;\n            *rec = temp_rec;\n        }\n    }\n    return hit_anything;\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Camera\n\nstruct camera_create_params {\n    lookfrom: vec3f,\n    lookat: vec3f,\n    vup : vec3f,\n    vfov: f32, // vertical field-of-view in degrees\n    aspect_ratio: f32,\n    aperture : f32,\n    focus_dist: f32\n}\n\nstruct camera {\n    origin: vec3f,\n    lower_left_corner: vec3f,\n    horizontal: vec3f,\n    vertical: vec3f,\n    u : vec3f,\n    v : vec3f,\n    w : vec3f,\n    lens_radius : f32,\n}\n\nfn camera_create(p: camera_create_params) -> camera {\n    let theta = radians(p.vfov);\n    let h = tan(theta/2);\n    let viewport_height = 2.0 * h;\n    let viewport_width = p.aspect_ratio * viewport_height;\n\n    // Note: vup, v, and w are all in the same plane\n    let w = normalize(p.lookfrom - p.lookat);\n    let u = normalize(cross(p.vup, w));\n    let v = cross(w, u);\n\n    let origin = p.lookfrom;\n    let horizontal = p.focus_dist * viewport_width * u;\n    let vertical = p.focus_dist * viewport_height * v;\n    let lower_left_corner = origin - horizontal/2 - vertical/2 - p.focus_dist * w;\n    let lens_radius = p.aperture / 2;\n\n    return camera(origin, lower_left_corner, horizontal, vertical, u, v, w, lens_radius);\n}\n\nfn camera_get_ray(cam: ptr<function, camera>, s: f32, t: f32) -> ray {\n    let rd = (*cam).lens_radius * random_in_unit_disk();\n    let offset = (*cam).u * rd.x + (*cam).v * rd.y;\n    return ray(\n        (*cam).origin + offset,\n        (*cam).lower_left_corner + s * (*cam).horizontal + t * (*cam).vertical - (*cam).origin - offset\n    );\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Random\n\n// Implementation copied from https://webgpu.github.io/webgpu-samples/samples/particles#./particle.wgsl\nvar<private> rand_seed : vec2<f32>;\n\nfn init_rand(invocation_id : u32, seed : vec4<f32>) {\n  rand_seed = seed.xz;\n  rand_seed = fract(rand_seed * cos(35.456+f32(invocation_id) * seed.yw));\n  rand_seed = fract(rand_seed * cos(41.235+f32(invocation_id) * seed.xw));\n}\n\n// Returns random value in [0.0, 1.0)\nfn random_f32() -> f32 {\n    // return 0.0f;\n    rand_seed.x = fract(cos(dot(rand_seed, vec2<f32>(23.14077926, 232.61690225))) * 136.8168);\n    rand_seed.y = fract(cos(dot(rand_seed, vec2<f32>(54.47856553, 345.84153136))) * 534.7645);\n    return rand_seed.y;\n}\n\nfn random_range_f32(min: f32, max: f32) -> f32 {\n    return mix(min, max, random_f32());\n}\n\nfn random_vec3f() -> vec3f {\n    return vec3(random_f32(), random_f32(), random_f32());\n}\n\nfn random_range_vec3f(min: f32, max: f32) -> vec3f {\n    return vec3(random_range_f32(min, max), random_range_f32(min, max), random_range_f32(min, max));\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////y////////////////////////\n// Main\n\n@group(0) @binding(").concat(this.bindings.output, ")\nvar<storage, read_write> output : array<u32>;\n\n@group(0) @binding(").concat(this.bindings.camera_create_params, ")\nvar<uniform> cp: camera_create_params;\n\nstruct raytracer_config {\n    samples_per_pixel: u32,\n    max_depth: u32\n}\n@group(0) @binding(").concat(this.bindings.raytracer_config, ")\nvar<uniform> config: raytracer_config;\n\nconst infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf\nconst pi = 3.1415926535897932385;\n\nfn ray_color(in_r: ray, in_max_depth: u32) -> color {\n    // Book uses recursion for bouncing rays. We can't recurse in WGSL, so convert algorithm to procedural.\n    var r = in_r;\n    var c : color = color(1,1,1);\n    var rec: hit_record;\n    var max_depth = in_max_depth;\n\n    while (true) {\n        if (hittable_list_hit(r, 0.001, infinity, &rec)) {\n           var attenuation: color;\n           var scattered: ray;\n            if (material_scatter(rec.mat, r, rec, &attenuation, &scattered)) {\n                c *= attenuation;\n                r = scattered;\n            } else {\n                // Material does not contribute, final color is black\n                c *= color(0,0,0);\n                break;\n            }\n\n        } else {\n            // If we hit nothing, return a blue sky color (linear blend of ray direction with white and blue)\n            let unit_direction = normalize(r.dir);\n            let t = 0.5 * (unit_direction.y + 1.0);\n            c *= (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);\n            break;\n        }\n\n        // If we've exceeded the ray bounce limit, no more light is gathered.\n        max_depth -= 1;\n        if (max_depth <= 0) {\n            c *= color(0,0,0);\n            break;\n        }\n    }\n\n    return c;\n}\n\nfn color_to_u32(c: color) -> u32 {\n    let r = u32(c.r * 255.0);\n    let g = u32(c.g * 255.0);\n    let b = u32(c.b * 255.0);\n    let a = 255u;\n\n    // bgra8unorm\n    return (a << 24) | (r << 16) | (g << 8) | b;\n\n    // rgba8unorm\n    // return (a << 24) | (b << 16) | (g << 8) | r;\n}\n\nfn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {\n    var c = pixel_color;\n    // Divide the color by the number of samples.\n    c /= f32(samples_per_pixel);\n\n    // And gamma-correct for gamma=2.0.\n    c = sqrt(c);\n\n    output[offset] = color_to_u32(c);\n}\n\n@compute @workgroup_size(").concat(wgSize, ")\nfn main(\n    @builtin(global_invocation_id) global_invocation_id : vec3<u32>,\n    ) {\n        init_rand(global_invocation_id.x, vec4(vec3f(global_invocation_id), 1.0));\n\n        // Camera\n        var cam = camera_create(cp);\n\n        // Render\n        // Compute current x,y\n        let offset = global_invocation_id.x;\n        let x = f32(offset % ").concat(width, ");\n        let y = ").concat(height, " - f32(offset / ").concat(width, "); // Flip Y so Y+ is up\n        const image_height = ").concat(height, ";\n        const image_width = ").concat(width, ";\n        \n        let samples_per_pixel = config.samples_per_pixel;\n        let max_depth = config.max_depth;\n\n        var pixel_color = color(0.0, 0.0, 0.0);\n        for (var i = 0u; i < samples_per_pixel; i += 1u) {\n            let u = (x + random_f32()) / (image_width - 1);\n            let v = (y + random_f32()) / (image_height - 1);\n            let r = camera_get_ray(&cam, u, v);\n            pixel_color += ray_color(r, max_depth);\n        }\n\n        // Store color for current pixel\n        write_color(offset, pixel_color, samples_per_pixel);\n}\n///////////////////////////////////////////////////////////////////////////////\n        ");
+      var wgsl = "\n///////////////////////////////////////////////////////////////////////////////\n// Common\nalias material_index = u32;\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Ray\n\nstruct ray {\n    orig : vec3f,\n    dir : vec3f,\n}\n\nfn ray_at(r: ray, t: f32) -> vec3f {\n    return r.orig + t * r.dir;\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Color\n\nalias color = vec3f;\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Utils\nfn length_squared(v: vec3f) -> f32 {\n    let l = length(v);\n    return l * l;\n}\n\nfn near_zero(v: vec3f) -> bool {\n    const s = 1e-8;\n    return length(v) < s;\n}\n\nfn random_in_unit_sphere() -> vec3f {\n    for (var i = 0; i < 1000; i += 1) {\n        let p = random_range_vec3f(-1, 1);\n        if (length_squared(p) >= 1) {\n            continue;\n        }\n        return p;\n    }\n    return vec3f(0,0,0.3);\n}\n\nfn random_unit_vector() -> vec3f {\n    return normalize(random_in_unit_sphere());\n}\n\nfn random_in_hemisphere(normal: vec3f) -> vec3f {\n    let in_unit_sphere = random_in_unit_sphere();\n    if (dot(in_unit_sphere, normal) > 0.0) { // In the same hemisphere as the normal\n        return in_unit_sphere;\n    }\n    else {\n        return -in_unit_sphere;\n    }\n}\n\nfn random_in_unit_disk() -> vec3f {\n    for (var i = 0; i < 1000; i += 1) {\n        let p = vec3f(random_range_f32(-1,1), random_range_f32(-1,1), 0);\n        if (length_squared(p) >= 1) {\n            continue;\n        }\n        return p;\n    }\n    return vec3f(0.3,0,0);\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Hittable\nstruct hit_record {\n    p: vec3f,\n    normal: vec3f,\n    t: f32,\n    front_face: bool,\n    mat: material_index,\n}\n\nfn hit_record_set_face_normal(rec: ptr<function, hit_record>, r: ray, outward_normal: vec3f) {\n    (*rec).front_face = dot(r.dir, outward_normal) < 0.0;\n    if ((*rec).front_face) {\n        (*rec).normal = outward_normal;\n    } else {\n        (*rec).normal = -outward_normal;\n    }\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Material\n\nalias material_type = u32;\nconst MATERIAL_LAMBERTIAN:  material_type = 0;\nconst MATERIAL_METAL:       material_type = 1;\nconst MATERIAL_DIELECTRIC:  material_type = 2;\n\nstruct lambertian_material {\n    albedo: color,\n}\n\nstruct metal_material {\n    albedo: color,\n    fuzz: f32,\n}\n\nstruct dielectric_material {\n    ir: f32 // index of refraction\n}\n\nstruct material {\n    // NOTE: ideally we'd use a discriminated union\n    ty: material_type,\n    lambertian: lambertian_material,\n    metal: metal_material,\n    dielectric: dielectric_material\n}\n\nconst NUM_MATERIALS = ".concat(numMaterials, ";\n\n@group(0) @binding(").concat(this.bindings.materials, ")\nvar<uniform> materials: array<material, NUM_MATERIALS>;\n\n\n// For the input ray and hit on the input material, returns true if the ray bounces, and if so,\n// stores the color contribution (attenuation) from this material and the new bounce (scatter) ray.\nfn material_scatter(mat: material_index, r_in: ray, rec: hit_record, attenuation: ptr<function, color>, scattered: ptr<function, ray>) -> bool {\n    let m = materials[mat];\n    if (m.ty == MATERIAL_LAMBERTIAN) {\n        var scatter_direction = rec.normal + random_unit_vector();\n\n        // Catch degenerate scatter direction\n        if (near_zero(scatter_direction)) {\n            scatter_direction = rec.normal;\n        }\n\n        *scattered = ray(rec.p, scatter_direction);\n        *attenuation = m.lambertian.albedo;\n        return true;\n\n    } else if (m.ty == MATERIAL_METAL) {\n        let reflected = reflect(normalize(r_in.dir), rec.normal);\n        *scattered = ray(rec.p, reflected + m.metal.fuzz * random_in_unit_sphere());\n        *attenuation = m.metal.albedo;\n        // Only bounce rays that reflect in the same direction as the incident normal\n        return dot((*scattered).dir, rec.normal) > 0;\n    \n    } else if (m.ty == MATERIAL_DIELECTRIC) {\n        *attenuation = color(1, 1, 1);\n        let refraction_ratio = select(m.dielectric.ir, 1.0 / m.dielectric.ir, rec.front_face);\n\n        let unit_direction = normalize(r_in.dir);\n        let cos_theta = min(dot(-unit_direction, rec.normal), 1.0);\n        let sin_theta = sqrt(1.0 - cos_theta * cos_theta);\n\n        let cannot_refract = (refraction_ratio * sin_theta) > 1.0;\n        var direction: vec3f;\n\n        if (cannot_refract || reflectance(cos_theta, refraction_ratio) > random_f32()) {\n            direction = reflect(unit_direction, rec.normal);\n        } else {\n            direction = refract(unit_direction, rec.normal, refraction_ratio);\n        }\n\n        *scattered = ray(rec.p, direction);\n        return true;\n    }\n\n    return false;\n}\n\nfn reflectance(cosine: f32, ref_idx: f32) -> f32 {\n    // Use Schlick's approximation for reflectance.\n    var r0 = (1-ref_idx) / (1+ref_idx);\n    r0 = r0*r0;\n    return r0 + (1-r0)*pow((1 - cosine),5);\n}\n\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Sphere\nstruct sphere {\n    center: vec3f,\n    radius: f32,\n    mat: material_index,\n}\n\nfn sphere_hit(sphere_index: u32, r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {\n    let s = &world.spheres[sphere_index];\n    let oc = r.orig - (*s).center;\n    let a = length_squared(r.dir);\n    let half_b = dot(oc, r.dir);\n    let c = length_squared(oc) - (*s).radius*(*s).radius;\n    let discriminant = half_b*half_b - a*c;\n\n    if (discriminant < 0) {\n        return false;\n    }\n\n    let sqrtd = sqrt(discriminant);\n\n    // Find the nearest root that lies in the acceptable range.\n    var root = (-half_b - sqrtd) / a;\n    if (root < t_min || t_max < root) {\n        root = (-half_b + sqrtd) / a;\n        if (root < t_min || t_max < root) {\n            return false;\n        }\n    }\n\n    (*rec).t = root;\n    (*rec).p = ray_at(r, (*rec).t);\n    let outward_normal = ((*rec).p - (*s).center) / (*s).radius;\n    hit_record_set_face_normal(rec, r, outward_normal);\n    (*rec).mat = (*s).mat;\n\n    return true;\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Hittable List\nconst NUM_SPHERES = ").concat(numSpheres, ";\nstruct hittable_list {\n    spheres: array<sphere, NUM_SPHERES>,\n}\n\n@group(0) @binding(").concat(this.bindings.hittable_list, ")\nvar<uniform> world: hittable_list;\n\nfn hittable_list_hit(r: ray, t_min: f32, t_max: f32, rec: ptr<function, hit_record>) -> bool {\n    var temp_rec: hit_record;\n    var hit_anything = false;\n    var closest_so_far = t_max;\n\n    for (var i = 0u; i < NUM_SPHERES; i += 1u) {\n        let s = &world.spheres[i];\n        if (sphere_hit(i, r, t_min, closest_so_far, &temp_rec)) {\n            hit_anything = true;\n            closest_so_far = temp_rec.t;\n            *rec = temp_rec;\n        }\n    }\n    return hit_anything;\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Camera\n\nstruct camera_create_params {\n    lookfrom: vec3f,\n    lookat: vec3f,\n    vup : vec3f,\n    vfov: f32, // vertical field-of-view in degrees\n    aspect_ratio: f32,\n    aperture : f32,\n    focus_dist: f32\n}\n\nstruct camera {\n    origin: vec3f,\n    lower_left_corner: vec3f,\n    horizontal: vec3f,\n    vertical: vec3f,\n    u : vec3f,\n    v : vec3f,\n    w : vec3f,\n    lens_radius : f32,\n}\n\nfn camera_create(p: camera_create_params) -> camera {\n    let theta = radians(p.vfov);\n    let h = tan(theta/2);\n    let viewport_height = 2.0 * h;\n    let viewport_width = p.aspect_ratio * viewport_height;\n\n    // Note: vup, v, and w are all in the same plane\n    let w = normalize(p.lookfrom - p.lookat);\n    let u = normalize(cross(p.vup, w));\n    let v = cross(w, u);\n\n    let origin = p.lookfrom;\n    let horizontal = p.focus_dist * viewport_width * u;\n    let vertical = p.focus_dist * viewport_height * v;\n    let lower_left_corner = origin - horizontal/2 - vertical/2 - p.focus_dist * w;\n    let lens_radius = p.aperture / 2;\n\n    return camera(origin, lower_left_corner, horizontal, vertical, u, v, w, lens_radius);\n}\n\nfn camera_get_ray(cam: ptr<function, camera>, s: f32, t: f32) -> ray {\n    let rd = (*cam).lens_radius * random_in_unit_disk();\n    let offset = (*cam).u * rd.x + (*cam).v * rd.y;\n    return ray(\n        (*cam).origin + offset,\n        (*cam).lower_left_corner + s * (*cam).horizontal + t * (*cam).vertical - (*cam).origin - offset\n    );\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////////////////////////////\n// Random\n\n// Implementation copied from https://webgpu.github.io/webgpu-samples/samples/particles#./particle.wgsl\nvar<private> rand_seed : vec2<f32>;\n\nfn init_rand(invocation_id : u32, seed : vec4f) {\n  rand_seed = seed.xz;\n  rand_seed = fract(rand_seed * cos(35.456+f32(invocation_id) * seed.yw));\n  rand_seed = fract(rand_seed * cos(41.235+f32(invocation_id) * seed.xw));\n}\n\n// Returns random value in [0.0, 1.0)\nfn random_f32() -> f32 {\n    // return 0.0f;\n    rand_seed.x = fract(cos(dot(rand_seed, vec2<f32>(23.14077926, 232.61690225))) * 136.8168);\n    rand_seed.y = fract(cos(dot(rand_seed, vec2<f32>(54.47856553, 345.84153136))) * 534.7645);\n    return rand_seed.y;\n}\n\nfn random_range_f32(min: f32, max: f32) -> f32 {\n    return mix(min, max, random_f32());\n}\n\nfn random_vec3f() -> vec3f {\n    return vec3(random_f32(), random_f32(), random_f32());\n}\n\nfn random_range_vec3f(min: f32, max: f32) -> vec3f {\n    return vec3(random_range_f32(min, max), random_range_f32(min, max), random_range_f32(min, max));\n}\n///////////////////////////////////////////////////////////////////////////////\n\n///////////////////////////////////////////////////////y////////////////////////\n// Main\n\n@group(0) @binding(").concat(this.bindings.output, ")\nvar<storage, read_write> output : array<u32>;\n\n@group(0) @binding(").concat(this.bindings.camera_create_params, ")\nvar<uniform> cp: camera_create_params;\n\nstruct raytracer_config {\n    samples_per_pixel: u32,\n    max_depth: u32,\n    rand_seed: vec4f,\n    weight: f32,\n}\n@group(0) @binding(").concat(this.bindings.raytracer_config, ")\nvar<uniform> config: raytracer_config;\n\nconst infinity = 3.402823466e+38; // NOTE: largest f32 instead of inf\nconst pi = 3.1415926535897932385;\n\nfn ray_color(in_r: ray, in_max_depth: u32) -> color {\n    // Book uses recursion for bouncing rays. We can't recurse in WGSL, so convert algorithm to procedural.\n    var r = in_r;\n    var c : color = color(1,1,1);\n    var rec: hit_record;\n    var max_depth = in_max_depth;\n\n    while (true) {\n        if (hittable_list_hit(r, 0.001, infinity, &rec)) {\n           var attenuation: color;\n           var scattered: ray;\n            if (material_scatter(rec.mat, r, rec, &attenuation, &scattered)) {\n                c *= attenuation;\n                r = scattered;\n            } else {\n                // Material does not contribute, final color is black\n                c *= color(0,0,0);\n                break;\n            }\n\n        } else {\n            // If we hit nothing, return a blue sky color (linear blend of ray direction with white and blue)\n            let unit_direction = normalize(r.dir);\n            let t = 0.5 * (unit_direction.y + 1.0);\n            c *= (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);\n            break;\n        }\n\n        // If we've exceeded the ray bounce limit, no more light is gathered.\n        max_depth -= 1;\n        if (max_depth <= 0) {\n            c *= color(0,0,0);\n            break;\n        }\n    }\n\n    return c;\n}\n\nfn color_to_u32(c: color) -> u32 {\n    let r = u32(c.r * 255.0);\n    let g = u32(c.g * 255.0);\n    let b = u32(c.b * 255.0);\n    let a = 255u;\n\n    // bgra8unorm\n    return (a << 24) | (r << 16) | (g << 8) | b;\n\n    // rgba8unorm\n    // return (a << 24) | (b << 16) | (g << 8) | r;\n}\n\nfn u32_to_color(c: u32) -> color {\n    let r = f32((c >> 16) & 0xff) / 255.0;\n    let g = f32((c >> 8) & 0xff) / 255.0;\n    let b = f32((c >> 0) & 0xff) / 255.0;\n    return color(r, g, b);\n}\n\nfn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {\n    var c = pixel_color;\n    // Divide the color by the number of samples.\n    c /= f32(samples_per_pixel);\n\n    // And gamma-correct for gamma=2.0.\n    c = sqrt(c);\n\n    var last = u32_to_color(output[offset]);\n    var w = config.weight;\n    output[offset] = color_to_u32(last * (1-w) + c * w);\n}\n\n@compute @workgroup_size(").concat(wgSize, ")\nfn main(\n    @builtin(global_invocation_id) global_invocation_id : vec3<u32>,\n    ) {\n        init_rand(global_invocation_id.x, config.rand_seed);\n\n        // Camera\n        var cam = camera_create(cp);\n\n        // Render\n\n        // Compute current x,y\n        let offset = global_invocation_id.x;\n        \n        // Skip if out of bounds (TODO: only invoke required number of workgroups)\n        if (offset >= u32(").concat(width * height, ")) {\n            return;\n        }\n\n        let x = f32(offset % ").concat(width, ");\n        let y = ").concat(height, " - f32(offset / ").concat(width, "); // Flip Y so Y+ is up\n        const image_height = ").concat(height, ";\n        const image_width = ").concat(width, ";\n        \n        let samples_per_pixel = config.samples_per_pixel;\n        let max_depth = config.max_depth;\n\n        var pixel_color = color(0.0, 0.0, 0.0);\n        for (var i = 0u; i < samples_per_pixel; i += 1u) {\n            let u = (x + random_f32()) / (image_width - 1);\n            let v = (y + random_f32()) / (image_height - 1);\n            let r = camera_get_ray(&cam, u, v);\n            pixel_color += ray_color(r, max_depth);\n        }\n\n        // Store color for current pixel\n        write_color(offset, pixel_color, samples_per_pixel);\n}\n///////////////////////////////////////////////////////////////////////////////\n        ");
       return wgsl;
     }
   }]);
