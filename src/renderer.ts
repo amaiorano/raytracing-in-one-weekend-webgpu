@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 
-import { vec3 } from 'gl-matrix'
+import { vec3, vec4 } from 'gl-matrix'
 import { Pane } from 'tweakpane'
 
 function Buf2Hex(buffer: ArrayBuffer): string {
@@ -45,6 +45,12 @@ class BufferWriter {
     setVec3f(offset: number, v: vec3) {
         new Float32Array(this.buffer, offset).set([
             v[0], v[1], v[2]
+        ]);
+    }
+
+    setVec4f(offset: number, v: vec4) {
+        new Float32Array(this.buffer, offset).set([
+            v[0], v[1], v[2], v[3]
         ]);
     }
 }
@@ -197,11 +203,14 @@ class CameraCreateParams {
 }
 
 class RaytracerConfig {
-    // /*           align(4) size(8) */ struct raytracer_config {
-    // /* offset(0) align(4) size(4) */   samples_per_pixel : u32;
-    // /* offset(4) align(4) size(4) */   max_depth : u32;
-    // /*                            */ };
-
+    // /*            align(16) size(48) */ struct raytracer_config {
+    // /* offset( 0) align( 4) size( 4) */   samples_per_pixel : u32;
+    // /* offset( 4) align( 4) size( 4) */   max_depth : u32;
+    // /* offset( 8) align( 1) size( 8) */   // -- implicit field alignment padding --;
+    // /* offset(16) align(16) size(16) */   rand_seed : vec4<f32>;
+    // /* offset(32) align( 4) size( 4) */   weight : f32;
+    // /* offset(36) align( 1) size(12) */   // -- implicit struct size padding --;
+    // /*                               */ };
     buffer: ArrayBuffer;
     private writer: BufferWriter
     constructor() {
@@ -218,6 +227,14 @@ class RaytracerConfig {
     }
     max_depth(v: number): RaytracerConfig {
         this.writer.setU32(4, v);
+        return this;
+    }
+    rand_seed(v: vec4) {
+        this.writer.setVec4f(16, v);
+        return this;
+    }
+    weight(v: number) {
+        this.writer.setF32(32, v);
         return this;
     }
 }
@@ -265,7 +282,6 @@ export default class Renderer {
     materials: Materials;
     hittableList: HittableList;
     cameraCreateParams: CameraCreateParams;
-    raytracerConfig: RaytracerConfig;
 
     // Config vars
     config = {
@@ -487,12 +503,9 @@ export default class Renderer {
         this.cameraCreateParamsBuffer.unmap();
 
         this.raytracerConfigBuffer = this.device.createBuffer({
-            size: this.raytracerConfig.buffer.byteLength,
+            size: new RaytracerConfig().buffer.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            mappedAtCreation: true,
         });
-        Copy(this.raytracerConfig.buffer, this.raytracerConfigBuffer.getMappedRange());
-        this.raytracerConfigBuffer.unmap();
 
         const code = this.computeShader(this.wgSize, this.materials.count, this.hittableList.count);
         // console.log(code);
@@ -519,7 +532,6 @@ export default class Renderer {
     }
 
     initTweakPane() {
-        this.raytracerConfig = new RaytracerConfig();
         this.pane = new Pane;
 
         // Resolution
@@ -579,7 +591,6 @@ export default class Renderer {
             { label: 'Samples Per Pixel', min: 1, max: 50, step: 1 });
         input.on('change', ev => {
             if (ev.last) {
-                this.raytracerConfig.samples_per_pixel(ev.value)
                 this.updatePipeline(); // TODO: queue.copy
             }
         });
@@ -588,7 +599,6 @@ export default class Renderer {
             { label: 'Max Ray Depth', min: 2, max: 20, step: 1 });
         input.on('change', ev => {
             if (ev.last) {
-                this.raytracerConfig.max_depth(ev.value)
                 this.updatePipeline(); // TODO: queue.copy
             }
         });
@@ -608,7 +618,7 @@ export default class Renderer {
             this.device = await this.adapter.requestDevice();
             this.queue = this.device.queue;
 
-            const wgSize = 256;
+            const wgSize = 64;
             const width = this.renderDims.width;
             const height = this.renderDims.height;
 
@@ -621,7 +631,7 @@ export default class Renderer {
                 const bufferNumElements = width * height;
                 this.outputBuffer = this.device.createBuffer({
                     size: bufferNumElements * Uint32Array.BYTES_PER_ELEMENT,
-                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
                     // mappedAtCreation: true,
                 });
                 // const data = new Uint32Array(this.outputBuffer.getMappedRange());
@@ -657,28 +667,63 @@ export default class Renderer {
         }
     }
 
+    frameSamplesPerPixel = {
+        max: 1, // Max per frame (constant)
+        left: 0, // How many are left to process this frame
+        done: 0 // How many processed so far
+    }
+
     // Called once per frame
     render(dt: number) {
         if (dt > 1) {
             console.log(`Long frame detected: ${dt} seconds`);
         }
-
-        let commandBuffers = Array<GPUCommandBuffer>();
-
         if (this.pipeline === undefined) {
             return;
         }
 
+        let commandBuffers = Array<GPUCommandBuffer>();
         const encoder = this.device.createCommandEncoder();
 
-
         if (this.dirty) {
+            this.frameSamplesPerPixel.left = this.config.samplesPerPixel;
+            this.frameSamplesPerPixel.done = 0;
+            // Clear output buffer to start accumulating into it
+            encoder.clearBuffer(this.outputBuffer);
+            this.dirty = false;
+        }
+
+        if (this.frameSamplesPerPixel.left > 0) {
+            let currSamplesPerPixel = Math.min(this.frameSamplesPerPixel.left, this.frameSamplesPerPixel.max);
+            // Compute the amount this frame will contribute to the final pixel as a ratio of how many samples have
+            // been processed so far.
+            let weight = currSamplesPerPixel / (this.frameSamplesPerPixel.done + currSamplesPerPixel);
+            // console.log(`currSamplesPerPixel: ${currSamplesPerPixel}, weight: ${weight}`)
+
+            let config = new RaytracerConfig();
+            config.max_depth(this.config.maxDepth);
+            config.samples_per_pixel(currSamplesPerPixel);
+            config.rand_seed(vec4.fromValues(Math.random(), Math.random(), Math.random(), Math.random()));
+            config.weight(weight);
+
+            // TODO: cache set of staging buffers
+            const stagingBuffer = this.device.createBuffer({
+                size: config.buffer.byteLength,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_SRC,
+                mappedAtCreation: true,
+            });
+            Copy(config.buffer, stagingBuffer.getMappedRange());
+            encoder.copyBufferToBuffer(stagingBuffer, 0, this.raytracerConfigBuffer, 0, config.buffer.byteLength);
+            stagingBuffer.unmap();
+
             const pass = encoder.beginComputePass();
             pass.setPipeline(this.pipeline);
             pass.setBindGroup(0, this.bindGroup);
             pass.dispatchWorkgroups(this.numGroups);
             pass.end();
-            this.dirty = false;
+
+            this.frameSamplesPerPixel.left -= currSamplesPerPixel;
+            this.frameSamplesPerPixel.done += currSamplesPerPixel;
         }
 
         // Copy output from compute shader to canvas
@@ -1018,7 +1063,7 @@ fn camera_get_ray(cam: ptr<function, camera>, s: f32, t: f32) -> ray {
 // Implementation copied from https://webgpu.github.io/webgpu-samples/samples/particles#./particle.wgsl
 var<private> rand_seed : vec2<f32>;
 
-fn init_rand(invocation_id : u32, seed : vec4<f32>) {
+fn init_rand(invocation_id : u32, seed : vec4f) {
   rand_seed = seed.xz;
   rand_seed = fract(rand_seed * cos(35.456+f32(invocation_id) * seed.yw));
   rand_seed = fract(rand_seed * cos(41.235+f32(invocation_id) * seed.xw));
@@ -1056,7 +1101,9 @@ var<uniform> cp: camera_create_params;
 
 struct raytracer_config {
     samples_per_pixel: u32,
-    max_depth: u32
+    max_depth: u32,
+    rand_seed: vec4f,
+    weight: f32,
 }
 @group(0) @binding(${this.bindings.raytracer_config})
 var<uniform> config: raytracer_config;
@@ -1116,6 +1163,13 @@ fn color_to_u32(c: color) -> u32 {
     // return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
+fn u32_to_color(c: u32) -> color {
+    let r = f32((c >> 16) & 0xff) / 255.0;
+    let g = f32((c >> 8) & 0xff) / 255.0;
+    let b = f32((c >> 0) & 0xff) / 255.0;
+    return color(r, g, b);
+}
+
 fn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {
     var c = pixel_color;
     // Divide the color by the number of samples.
@@ -1124,21 +1178,30 @@ fn write_color(offset: u32, pixel_color: color, samples_per_pixel: u32) {
     // And gamma-correct for gamma=2.0.
     c = sqrt(c);
 
-    output[offset] = color_to_u32(c);
+    var last = u32_to_color(output[offset]);
+    var w = config.weight;
+    output[offset] = color_to_u32(last * (1-w) + c * w);
 }
 
 @compute @workgroup_size(${wgSize})
 fn main(
     @builtin(global_invocation_id) global_invocation_id : vec3<u32>,
     ) {
-        init_rand(global_invocation_id.x, vec4(vec3f(global_invocation_id), 1.0));
+        init_rand(global_invocation_id.x, config.rand_seed);
 
         // Camera
         var cam = camera_create(cp);
 
         // Render
+
         // Compute current x,y
         let offset = global_invocation_id.x;
+        
+        // Skip if out of bounds (TODO: only invoke required number of workgroups)
+        if (offset >= u32(${width * height})) {
+            return;
+        }
+
         let x = f32(offset % ${width});
         let y = ${height} - f32(offset / ${width}); // Flip Y so Y+ is up
         const image_height = ${height};
