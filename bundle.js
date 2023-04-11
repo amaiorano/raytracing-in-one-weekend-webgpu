@@ -10050,6 +10050,7 @@ var Renderer = /*#__PURE__*/function () {
       // Set to list of [width, height]
       scene: 1,
       samplesPerPixel: 25,
+      infiniteSamples: false,
       maxDepth: 10
     });
     _defineProperty(this, "dirty", true);
@@ -10355,6 +10356,7 @@ var Renderer = /*#__PURE__*/function () {
         }
       });
 
+      var samplesPerPixelInput = input;
       input = this.pane.addInput(this.config, 'maxDepth', {
         label: 'Max Ray Depth',
         min: 2,
@@ -10363,6 +10365,16 @@ var Renderer = /*#__PURE__*/function () {
       });
       input.on('change', function (ev) {
         if (ev.last) {
+          _this.updatePipeline(); // TODO: queue.copy
+        }
+      });
+
+      input = this.pane.addInput(this.config, 'infiniteSamples', {
+        label: 'Infinite Samples'
+      });
+      input.on('change', function (ev) {
+        if (ev.last) {
+          samplesPerPixelInput.disabled = ev.value != 0;
           _this.updatePipeline(); // TODO: queue.copy
         }
       });
@@ -10481,7 +10493,11 @@ var Renderer = /*#__PURE__*/function () {
       var commandBuffers = Array();
       var encoder = this.device.createCommandEncoder();
       if (this.dirty) {
-        this.frameSamplesPerPixel.left = this.config.samplesPerPixel;
+        if (this.config.infiniteSamples) {
+          this.frameSamplesPerPixel.left = Number.MAX_VALUE;
+        } else {
+          this.frameSamplesPerPixel.left = this.config.samplesPerPixel;
+        }
         this.frameSamplesPerPixel.done = 0;
         // Clear output buffer to start accumulating into it
         encoder.clearBuffer(this.outputBuffer);
