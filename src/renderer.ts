@@ -1,7 +1,9 @@
 /// <reference types="@webgpu/types" />
 
+import { colorToFunctionalHslString } from '@tweakpane/core';
 import { vec3, vec4 } from 'gl-matrix'
 import { Pane } from 'tweakpane'
+import { RNG } from './common'
 
 function Buf2Hex(buffer: ArrayBuffer): string {
     return [...new Uint8Array(buffer)]
@@ -252,6 +254,7 @@ export default class Renderer {
     canvas: HTMLCanvasElement;
     renderDims: Dims;
     pane: Pane;
+    rng: RNG = new RNG();
 
     // API Data Structures
     adapter: GPUAdapter;
@@ -290,6 +293,7 @@ export default class Renderer {
         samplesPerPixel: 25,
         infiniteSamples: false,
         maxDepth: 10,
+        disableDepthOfField: false,
     }
 
     dirty = true;
@@ -305,7 +309,14 @@ export default class Renderer {
         }
     }
 
+    random(min = 0, max = 1): number {
+        return (this.rng.rand() * (max - min)) + min;
+    }
+
     updateScene() {
+        // Seed the RNG here so that we always produce the same scene
+        this.rng.seed(0x12345678);
+
         this.materials = new Materials();
         this.hittableList = new HittableList();
         this.cameraCreateParams = new CameraCreateParams();
@@ -417,9 +428,7 @@ export default class Renderer {
             const ground_material = this.materials.addLambertian(vec3.fromValues(0.5, 0.5, 0.5));
             this.hittableList.addSphere(vec3.fromValues(0, -1000, 0), 1000, ground_material);
 
-            const rand = function (min = 0, max = 1) {
-                return (Math.random() * (max - min)) + min;
-            };
+            const rand = this.random.bind(this);
 
             const randomColor = function (min = 0, max = 1) {
                 return vec3.fromValues(rand(min, max), rand(min, max), rand(min, max));
@@ -427,8 +436,8 @@ export default class Renderer {
 
             for (let a = -11; a < 11; a++) {
                 for (let b = -11; b < 11; b++) {
-                    const choose_mat = Math.random();
-                    const center = vec3.fromValues(a + 0.9 * rand(), 0.2, b + 0.9 * rand())
+                    const choose_mat = this.random();
+                    const center = vec3.fromValues(a + 0.9 * this.random(), 0.2, b + 0.9 * rand())
 
                     let delta = vec3.create();
                     vec3.sub(delta, center, vec3.fromValues(4, 0.2, 0));
@@ -475,6 +484,10 @@ export default class Renderer {
                 .aperture(0.1)
                 .vfov(20.0)
                 .aspect_ratio(this.renderDims.width / this.renderDims.height);
+        }
+
+        if (this.config.disableDepthOfField) {
+            this.cameraCreateParams.aperture(0.0);
         }
     }
 
@@ -614,6 +627,15 @@ export default class Renderer {
             }
         });
 
+        input = this.pane.addInput(this.config, 'disableDepthOfField',
+            { label: 'Disable DOF effect' });
+        input.on('change', ev => {
+            if (ev.last) {
+                this.updateScene();
+                this.updatePipeline(); // TODO: queue.copy
+            }
+        });
+
         this.config.scene = 11;
     }
 
@@ -718,7 +740,7 @@ export default class Renderer {
             let config = new RaytracerConfig();
             config.max_depth(this.config.maxDepth);
             config.samples_per_pixel(currSamplesPerPixel);
-            config.rand_seed(vec4.fromValues(Math.random(), Math.random(), Math.random(), Math.random()));
+            config.rand_seed(vec4.fromValues(this.random(), this.random(), this.random(), this.random()));
             config.weight(weight);
 
             // TODO: cache set of staging buffers
