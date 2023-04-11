@@ -576,7 +576,7 @@ export default class Renderer {
                     'Image 12: Fuzzed metal': 12,
                     'Image 16: A hollow glass sphere': 16,
                     'Image 18: A distant view': 18,
-                    'Image 19: Image 19: Zooming in': 19,
+                    'Image 19: Zooming in': 19,
                     'Image 20: Spheres with depth-of-field': 20,
                     'Image 21: Final scene': 21,
                 }
@@ -589,7 +589,7 @@ export default class Renderer {
         });
 
         input = this.pane.addInput(this.config, 'samplesPerPixel',
-            { label: 'Samples Per Pixel', min: 1, max: 50, step: 1 });
+            { label: 'Samples Per Pixel', min: 1, max: 200, step: 1 });
         input.on('change', ev => {
             if (ev.last) {
                 this.updatePipeline(); // TODO: queue.copy
@@ -1141,8 +1141,8 @@ fn ray_color(in_r: ray, in_max_depth: u32) -> color {
                 c *= attenuation;
                 r = scattered;
             } else {
-                // Material does not contribute, final color is black
-                c *= color(0,0,0);
+                // Material does not contribute
+                // c *= color(0,0,0);
                 break;
             }
 
@@ -1157,7 +1157,7 @@ fn ray_color(in_r: ray, in_max_depth: u32) -> color {
         // If we've exceeded the ray bounce limit, no more light is gathered.
         max_depth -= 1;
         if (max_depth <= 0) {
-            c *= color(0,0,0);
+            // c *= color(0,0,0);
             break;
         }
     }
