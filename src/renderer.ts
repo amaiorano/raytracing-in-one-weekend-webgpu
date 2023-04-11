@@ -288,6 +288,7 @@ export default class Renderer {
         resolutionIndex: 0, // Set to list of [width, height]
         scene: 1,
         samplesPerPixel: 25,
+        infiniteSamples: false,
         maxDepth: 10,
     }
 
@@ -594,11 +595,21 @@ export default class Renderer {
                 this.updatePipeline(); // TODO: queue.copy
             }
         });
+        let samplesPerPixelInput = input;
 
         input = this.pane.addInput(this.config, 'maxDepth',
             { label: 'Max Ray Depth', min: 2, max: 20, step: 1 });
         input.on('change', ev => {
             if (ev.last) {
+                this.updatePipeline(); // TODO: queue.copy
+            }
+        });
+
+        input = this.pane.addInput(this.config, 'infiniteSamples',
+            { label: 'Infinite Samples' });
+        input.on('change', ev => {
+            if (ev.last) {
+                samplesPerPixelInput.disabled = ev.value != 0;
                 this.updatePipeline(); // TODO: queue.copy
             }
         });
@@ -686,7 +697,11 @@ export default class Renderer {
         const encoder = this.device.createCommandEncoder();
 
         if (this.dirty) {
-            this.frameSamplesPerPixel.left = this.config.samplesPerPixel;
+            if (this.config.infiniteSamples) {
+                this.frameSamplesPerPixel.left = Number.MAX_VALUE;
+            } else {
+                this.frameSamplesPerPixel.left = this.config.samplesPerPixel;
+            }
             this.frameSamplesPerPixel.done = 0;
             // Clear output buffer to start accumulating into it
             encoder.clearBuffer(this.outputBuffer);
