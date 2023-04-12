@@ -9714,6 +9714,36 @@ var vec4_forEach = function () {
 }();
 // EXTERNAL MODULE: ./node_modules/tweakpane/dist/tweakpane.js
 var tweakpane = __webpack_require__(498);
+;// CONCATENATED MODULE: ./src/common.ts
+
+
+var RNG = /*#__PURE__*/function () {
+  function RNG() {
+    _classCallCheck(this, RNG);
+  }
+  _createClass(RNG, [{
+    key: "seed",
+    value: function seed(s) {
+      this.rng = this.mulberry32(s);
+    }
+  }, {
+    key: "rand",
+    value: function rand() {
+      return this.rng();
+    }
+  }, {
+    key: "mulberry32",
+    value: function mulberry32(a) {
+      return function () {
+        var t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+  }]);
+  return RNG;
+}();
 ;// CONCATENATED MODULE: ./src/renderer.ts
 
 
@@ -9727,6 +9757,7 @@ var tweakpane = __webpack_require__(498);
 function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
 function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
 /// <reference types="@webgpu/types" />
+
 
 
 
@@ -10026,18 +10057,11 @@ var Dims = /*#__PURE__*/_createClass(function Dims() {
   this.height = height;
 });
 var Renderer = /*#__PURE__*/function () {
-  // API Data Structures
-
-  // Frame Backings
-
-  // Compute vars
-  // Size of each workgroup
-  // Number of workgroups to dispatch
-
   // Config vars
 
   function Renderer(canvas) {
     _classCallCheck(this, Renderer);
+    _defineProperty(this, "rng", new RNG());
     _defineProperty(this, "bindings", {
       output: 0,
       materials: 1,
@@ -10051,7 +10075,8 @@ var Renderer = /*#__PURE__*/function () {
       scene: 1,
       samplesPerPixel: 25,
       infiniteSamples: false,
-      maxDepth: 10
+      maxDepth: 10,
+      disableDepthOfField: false
     });
     _defineProperty(this, "dirty", true);
     _defineProperty(this, "frameSamplesPerPixel", {
@@ -10092,8 +10117,17 @@ var Renderer = /*#__PURE__*/function () {
       return init;
     }()
   }, {
+    key: "random",
+    value: function random() {
+      var min = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+      var max = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+      return this.rng.rand() * (max - min) + min;
+    }
+  }, {
     key: "updateScene",
     value: function updateScene() {
+      // Seed the RNG here so that we always produce the same scene
+      this.rng.seed(0x12345678);
       this.materials = new Materials();
       this.hittableList = new HittableList();
       this.cameraCreateParams = new CameraCreateParams();
@@ -10168,11 +10202,7 @@ var Renderer = /*#__PURE__*/function () {
       } else if (scene === 21) {
         var ground_material = this.materials.addLambertian(fromValues(0.5, 0.5, 0.5));
         this.hittableList.addSphere(fromValues(0, -1000, 0), 1000, ground_material);
-        var rand = function rand() {
-          var min = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
-          var max = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
-          return Math.random() * (max - min) + min;
-        };
+        var rand = this.random.bind(this);
         var randomColor = function randomColor() {
           var min = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
           var max = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
@@ -10180,8 +10210,8 @@ var Renderer = /*#__PURE__*/function () {
         };
         for (var a = -11; a < 11; a++) {
           for (var b = -11; b < 11; b++) {
-            var choose_mat = Math.random();
-            var center = fromValues(a + 0.9 * rand(), 0.2, b + 0.9 * rand());
+            var choose_mat = this.random();
+            var center = fromValues(a + 0.9 * this.random(), 0.2, b + 0.9 * rand());
             var _delta3 = create();
             sub(_delta3, center, fromValues(4, 0.2, 0));
             if (_delta3.length > 0.9) {
@@ -10215,6 +10245,9 @@ var Renderer = /*#__PURE__*/function () {
         var _lookat3 = fromValues(0, 0, 0);
         var _focus_dist3 = 10.0;
         this.cameraCreateParams.lookfrom(_lookfrom3).lookat(_lookat3).vup(fromValues(0, 1, 0)).focus_dist(_focus_dist3).aperture(0.1).vfov(20.0).aspect_ratio(this.renderDims.width / this.renderDims.height);
+      }
+      if (this.config.disableDepthOfField) {
+        this.cameraCreateParams.aperture(0.0);
       }
     }
   }, {
@@ -10379,6 +10412,16 @@ var Renderer = /*#__PURE__*/function () {
         }
       });
 
+      input = this.pane.addInput(this.config, 'disableDepthOfField', {
+        label: 'Disable DOF effect'
+      });
+      input.on('change', function (ev) {
+        if (ev.last) {
+          _this.updateScene();
+          _this.updatePipeline(); // TODO: queue.copy
+        }
+      });
+
       this.config.scene = 11;
     }
   }, {
@@ -10513,7 +10556,7 @@ var Renderer = /*#__PURE__*/function () {
         var config = new RaytracerConfig();
         config.max_depth(this.config.maxDepth);
         config.samples_per_pixel(currSamplesPerPixel);
-        config.rand_seed(vec4_fromValues(Math.random(), Math.random(), Math.random(), Math.random()));
+        config.rand_seed(vec4_fromValues(this.random(), this.random(), this.random(), this.random()));
         config.weight(weight);
 
         // TODO: cache set of staging buffers
